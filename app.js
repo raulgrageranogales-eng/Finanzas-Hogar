@@ -22,29 +22,18 @@ import {
 
 
 /* =========================================
-   CONFIGURACIÓN FIREBASE
+   FIREBASE
    ========================================= */
 
 const firebaseConfig = {
-
     apiKey: "AIzaSyA1oKOXWYqauiGL4N8Oh3mG3JMP5ZFCxGw",
-
     authDomain: "finanzas-hogar-803fd.firebaseapp.com",
-
     projectId: "finanzas-hogar-803fd",
-
     storageBucket: "finanzas-hogar-803fd.firebasestorage.app",
-
     messagingSenderId: "461089916272",
-
     appId: "1:461089916272:web:c0755eddab52ea08673bb5"
-
 };
 
-
-/* =========================================
-   INICIALIZAR FIREBASE
-   ========================================= */
 
 const firebaseApp = initializeApp(firebaseConfig);
 
@@ -56,7 +45,7 @@ const googleProvider = new GoogleAuthProvider();
 
 
 /* =========================================
-   ELEMENTOS
+   ELEMENTOS DE LA INTERFAZ
    ========================================= */
 
 const loginScreen =
@@ -103,7 +92,7 @@ const backHome =
 
 
 /* =========================================
-   LOGIN GOOGLE
+   LOGIN CON GOOGLE
    ========================================= */
 
 googleLogin.addEventListener("click", async () => {
@@ -119,10 +108,13 @@ googleLogin.addEventListener("click", async () => {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "Error de inicio de sesión:",
+            error
+        );
 
         loginError.textContent =
-            "No se ha podido iniciar sesión.";
+            "No se ha podido iniciar sesión con Google.";
 
     }
 
@@ -130,18 +122,29 @@ googleLogin.addEventListener("click", async () => {
 
 
 /* =========================================
-   LOGOUT
+   CERRAR SESIÓN
    ========================================= */
 
 logoutButton.addEventListener("click", async () => {
 
-    await signOut(auth);
+    try {
+
+        await signOut(auth);
+
+    } catch (error) {
+
+        console.error(
+            "Error cerrando sesión:",
+            error
+        );
+
+    }
 
 });
 
 
 /* =========================================
-   ESTADO DE AUTENTICACIÓN
+   CONTROL DE AUTENTICACIÓN
    ========================================= */
 
 onAuthStateChanged(auth, async (user) => {
@@ -176,50 +179,84 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loadUser(user) {
 
-    const userRef =
-        doc(db, "users", user.uid);
+    try {
 
-    const userSnap =
-        await getDoc(userRef);
+        const userRef =
+            doc(db, "users", user.uid);
+
+        const userSnap =
+            await getDoc(userRef);
 
 
-    if (!userSnap.exists()) {
+        /*
+         * PRIMER ACCESO
+         */
 
-        await setDoc(userRef, {
+        if (!userSnap.exists()) {
 
-            uid: user.uid,
+            await setDoc(
+                userRef,
+                {
+                    uid: user.uid,
 
-            name: user.displayName || "Usuario",
+                    name:
+                        user.displayName ||
+                        "Usuario",
 
-            email: user.email || "",
+                    email:
+                        user.email ||
+                        "",
 
-            photoURL: user.photoURL || "",
+                    photoURL:
+                        user.photoURL ||
+                        "",
 
-            homeId: null,
+                    homeId: null,
 
-            createdAt: serverTimestamp()
+                    createdAt:
+                        serverTimestamp()
+                }
+            );
 
-        });
 
-        showNoHome();
+            showNoHome();
 
-        return;
+            return;
+        }
+
+
+        /*
+         * USUARIO EXISTENTE
+         */
+
+        const userData =
+            userSnap.data();
+
+
+        if (!userData.homeId) {
+
+            showNoHome();
+
+            return;
+        }
+
+
+        await loadHome(
+            userData.homeId
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Error cargando usuario:",
+            error
+        );
+
+        loginError.textContent =
+            "No se han podido cargar tus datos.";
+
     }
-
-
-    const userData =
-        userSnap.data();
-
-
-    if (!userData.homeId) {
-
-        showNoHome();
-
-        return;
-    }
-
-
-    await loadHome(userData.homeId);
 
 }
 
@@ -245,7 +282,8 @@ function showNoHome() {
 
 createHome.addEventListener("click", async () => {
 
-    const user = auth.currentUser;
+    const user =
+        auth.currentUser;
 
     if (!user) return;
 
@@ -256,7 +294,9 @@ createHome.addEventListener("click", async () => {
 
     if (!name) {
 
-        alert("Introduce un nombre para el hogar.");
+        alert(
+            "Introduce un nombre para el hogar."
+        );
 
         return;
     }
@@ -264,7 +304,9 @@ createHome.addEventListener("click", async () => {
 
     try {
 
-        /* Crear hogar */
+        /*
+         * CREAR HOGAR
+         */
 
         const homeRef =
             await addDoc(
@@ -275,13 +317,17 @@ createHome.addEventListener("click", async () => {
 
                     ownerId: user.uid,
 
-                    createdAt: serverTimestamp()
+                    createdAt:
+                        serverTimestamp()
 
                 }
             );
 
 
-        /* Añadir usuario como miembro */
+        /*
+         * AÑADIR PROPIETARIO
+         * COMO MIEMBRO
+         */
 
         await setDoc(
 
@@ -297,28 +343,41 @@ createHome.addEventListener("click", async () => {
 
                 uid: user.uid,
 
-                name: user.displayName || "Usuario",
+                name:
+                    user.displayName ||
+                    "Usuario",
 
-                email: user.email || "",
+                email:
+                    user.email ||
+                    "",
 
                 role: "owner",
 
-                joinedAt: serverTimestamp()
+                joinedAt:
+                    serverTimestamp()
 
             }
 
         );
 
 
-        /* Guardar homeId en usuario */
+        /*
+         * GUARDAR HOME ID
+         * EN EL USUARIO
+         */
 
         await setDoc(
 
-            doc(db, "users", user.uid),
+            doc(
+                db,
+                "users",
+                user.uid
+            ),
 
             {
 
-                homeId: homeRef.id
+                homeId:
+                    homeRef.id
 
             },
 
@@ -331,12 +390,17 @@ createHome.addEventListener("click", async () => {
         );
 
 
-        await loadHome(homeRef.id);
+        await loadHome(
+            homeRef.id
+        );
 
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "Error creando hogar:",
+            error
+        );
 
         alert(
             "No se ha podido crear el hogar."
@@ -353,34 +417,50 @@ createHome.addEventListener("click", async () => {
 
 async function loadHome(homeId) {
 
-    const homeRef =
-        doc(db, "homes", homeId);
+    try {
 
-    const homeSnap =
-        await getDoc(homeRef);
+        const homeRef =
+            doc(
+                db,
+                "homes",
+                homeId
+            );
+
+        const homeSnap =
+            await getDoc(homeRef);
 
 
-    if (!homeSnap.exists()) {
+        if (!homeSnap.exists()) {
 
-        showNoHome();
+            showNoHome();
 
-        return;
+            return;
+        }
+
+
+        const home =
+            homeSnap.data();
+
+
+        homeNameDisplay.textContent =
+            home.name;
+
+
+        noHome.classList.add("hidden");
+
+        homeContent.classList.remove("hidden");
+
+        privateContent.classList.add("hidden");
+
+
+    } catch (error) {
+
+        console.error(
+            "Error cargando hogar:",
+            error
+        );
+
     }
-
-
-    const home =
-        homeSnap.data();
-
-
-    homeNameDisplay.textContent =
-        home.name;
-
-
-    noHome.classList.add("hidden");
-
-    homeContent.classList.remove("hidden");
-
-    privateContent.classList.add("hidden");
 
 }
 
@@ -389,22 +469,34 @@ async function loadHome(homeId) {
    CUENTA PRIVADA
    ========================================= */
 
-privateButton.addEventListener("click", () => {
+privateButton.addEventListener(
+    "click",
+    () => {
 
-    homeContent.classList.add("hidden");
+        homeContent.classList.add("hidden");
 
-    privateContent.classList.remove("hidden");
+        privateContent.classList.remove(
+            "hidden"
+        );
 
-});
+    }
+);
 
 
-backHome.addEventListener("click", () => {
+backHome.addEventListener(
+    "click",
+    () => {
 
-    privateContent.classList.add("hidden");
+        privateContent.classList.add(
+            "hidden"
+        );
 
-    homeContent.classList.remove("hidden");
+        homeContent.classList.remove(
+            "hidden"
+        );
 
-});
+    }
+);
 
 
 /* =========================================
@@ -413,19 +505,22 @@ backHome.addEventListener("click", () => {
 
 if ("serviceWorker" in navigator) {
 
-    window.addEventListener("load", () => {
+    window.addEventListener(
+        "load",
+        () => {
 
-        navigator.serviceWorker.register(
-            "service-worker.js"
-        ).catch(error => {
+            navigator.serviceWorker.register(
+                "service-worker.js"
+            ).catch(error => {
 
-            console.error(
-                "Error registrando Service Worker:",
-                error
-            );
+                console.error(
+                    "Error registrando Service Worker:",
+                    error
+                );
 
-        });
+            });
 
-    });
+        }
+    );
 
 }
