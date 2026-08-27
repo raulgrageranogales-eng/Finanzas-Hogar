@@ -5,271 +5,179 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
 
-    function logged() {
-      return request.auth != null;
-    }
+    /* ================================================
+       USUARIO
+    ================================================ */
 
+    match /users/{uid} {
 
-    function ownUser(uid) {
-      return logged()
+      allow read, create, update, delete:
+        if request.auth != null
         && request.auth.uid == uid;
+
+
+      /* ================================================
+         MOVIMIENTOS PRIVADOS
+      ================================================ */
+
+      match /privateMovements/{movementId} {
+
+        allow read, create, update, delete:
+          if request.auth != null
+          && request.auth.uid == uid;
+
+      }
+
+
+      /* ================================================
+         CUENTAS PRIVADAS
+      ================================================ */
+
+      match /accounts/{accountId} {
+
+        allow read, create, update, delete:
+          if request.auth != null
+          && request.auth.uid == uid;
+
+      }
+
     }
 
 
-    function member(homeId) {
+    /* ================================================
+       HOGAR
+    ================================================ */
 
-      return logged()
+    match /homes/{homeId} {
+
+
+      /* ================================================
+         MIEMBROS
+      ================================================ */
+
+      match /members/{uid} {
+
+        allow read:
+          if request.auth != null
+          && exists(
+            /databases/$(database)
+            /documents/homes/$(homeId)
+            /members/$(request.auth.uid)
+          );
+
+
+        allow create:
+          if request.auth != null
+          && request.auth.uid == uid;
+
+
+        allow update, delete:
+          if request.auth != null
+          && request.auth.uid == uid;
+
+      }
+
+
+      /* ================================================
+         DOCUMENTO DEL HOGAR
+      ================================================ */
+
+      allow read:
+        if request.auth != null
         && exists(
           /databases/$(database)
           /documents/homes/$(homeId)
           /members/$(request.auth.uid)
         );
 
-    }
+
+      allow create:
+        if request.auth != null;
 
 
-    function owner(homeId) {
-
-      return logged()
-
-        && get(
+      allow update:
+        if request.auth != null
+        && exists(
           /databases/$(database)
           /documents/homes/$(homeId)
-        ).data.ownerId
-        == request.auth.uid;
-
-    }
+          /members/$(request.auth.uid)
+        );
 
 
-    /* =========================
-       USUARIOS
-    ========================= */
+      /* ================================================
+         MOVIMIENTOS COMUNES
+      ================================================ */
 
-    match /users/{uid} {
+      match /movements/{movementId} {
 
-      allow create:
-        if ownUser(uid);
-
-      allow read, update, delete:
-        if ownUser(uid);
-
-    }
-
-
-    /* =========================
-       CUENTAS PRIVADAS
-    ========================= */
-
-    match /users/{uid}/privateAccounts/{id} {
-
-      allow read, delete:
-        if ownUser(uid);
-
-      allow create:
-        if ownUser(uid)
-        && request.resource.data.userId == uid;
-
-      allow update:
-        if ownUser(uid)
-        && resource.data.userId == uid
-        && request.resource.data.userId == uid;
-
-    }
-
-
-    /* =========================
-       MOVIMIENTOS PRIVADOS
-    ========================= */
-
-    match /users/{uid}/privateTransactions/{id} {
-
-      allow read, delete:
-        if ownUser(uid);
-
-      allow create:
-        if ownUser(uid)
-        && request.resource.data.userId == uid;
-
-      allow update:
-        if ownUser(uid)
-        && resource.data.userId == uid
-        && request.resource.data.userId == uid;
-
-    }
-
-
-    /* =========================
-       OBJETIVOS PRIVADOS
-    ========================= */
-
-    match /users/{uid}/privateGoals/{id} {
-
-      allow read, delete:
-        if ownUser(uid);
-
-      allow create:
-        if ownUser(uid)
-        && request.resource.data.userId == uid;
-
-      allow update:
-        if ownUser(uid)
-        && resource.data.userId == uid
-        && request.resource.data.userId == uid;
-
-    }
-
-
-    /* =========================
-       HOGARES
-    ========================= */
-
-    match /homes/{homeId} {
-
-      allow create:
-        if logged()
-        && request.resource.data.ownerId
-        == request.auth.uid;
-
-      allow read:
-        if member(homeId);
-
-      allow update, delete:
-        if owner(homeId);
-
-
-      /* MIEMBROS */
-
-      match /members/{uid} {
-
-        allow read:
-          if member(homeId);
-
-        allow create:
-          if owner(homeId)
-          || (
-            logged()
-            && request.auth.uid == uid
+        allow read, create, update, delete:
+          if request.auth != null
+          && exists(
+            /databases/$(database)
+            /documents/homes/$(homeId)
+            /members/$(request.auth.uid)
           );
 
-        allow update:
-          if owner(homeId);
+      }
+
+
+      /* ================================================
+         OBJETIVOS
+      ================================================ */
+
+      match /goals/{goalId} {
+
+        allow read, create, update, delete:
+          if request.auth != null
+          && exists(
+            /databases/$(database)
+            /documents/homes/$(homeId)
+            /members/$(request.auth.uid)
+          );
+
+      }
+
+
+      /* ================================================
+         RECURRENTES
+      ================================================ */
+
+      match /recurring/{recurringId} {
+
+        allow read, create, update, delete:
+          if request.auth != null
+          && exists(
+            /databases/$(database)
+            /documents/homes/$(homeId)
+            /members/$(request.auth.uid)
+          );
+
+      }
+
+
+      /* ================================================
+         INVITACIONES
+      ================================================ */
+
+      match /invitations/{invitationId} {
+
+        allow read, create, update:
+          if request.auth != null
+          && exists(
+            /databases/$(database)
+            /documents/homes/$(homeId)
+            /members/$(request.auth.uid)
+          );
 
         allow delete:
-          if owner(homeId)
-          || (
-            member(homeId)
-            && request.auth.uid == uid
+          if request.auth != null
+          && exists(
+            /databases/$(database)
+            /documents/homes/$(homeId)
+            /members/$(request.auth.uid)
           );
 
       }
-
-
-      /* MOVIMIENTOS COMPARTIDOS */
-
-      match /sharedTransactions/{id} {
-
-        allow read:
-          if member(homeId);
-
-        allow create:
-          if member(homeId)
-          && request.resource.data.homeId == homeId
-          && request.resource.data.createdBy
-             == request.auth.uid;
-
-        allow update, delete:
-          if member(homeId);
-
-      }
-
-
-      /* OBJETIVOS COMPARTIDOS */
-
-      match /sharedGoals/{id} {
-
-        allow read:
-          if member(homeId);
-
-        allow create:
-          if member(homeId)
-          && request.resource.data.homeId == homeId;
-
-        allow update, delete:
-          if member(homeId);
-
-      }
-
-
-      /* RECURRENTES */
-
-      match /recurringTransactions/{id} {
-
-        allow read:
-          if member(homeId);
-
-        allow create:
-          if member(homeId)
-          && request.resource.data.homeId == homeId;
-
-        allow update, delete:
-          if member(homeId);
-
-      }
-
-    }
-
-
-    /* =========================
-       INVITACIONES
-    ========================= */
-
-    match /invitations/{id} {
-
-      allow create:
-        if logged()
-        && request.resource.data.createdBy
-           == request.auth.uid;
-
-      allow read:
-        if logged()
-        && (
-          resource.data.createdBy
-          == request.auth.uid
-
-          ||
-
-          resource.data.email
-          == request.auth.token.email
-        );
-
-      allow update:
-        if logged()
-        && (
-          resource.data.createdBy
-          == request.auth.uid
-
-          ||
-
-          resource.data.email
-          == request.auth.token.email
-        );
-
-      allow delete:
-        if logged()
-        && resource.data.createdBy
-           == request.auth.uid;
-
-    }
-
-
-    /* =========================
-       TODO LO DEMÁS BLOQUEADO
-    ========================= */
-
-    match /{document=**} {
-
-      allow read, write:
-        if false;
 
     }
 
