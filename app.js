@@ -26,8 +26,7 @@ import {
   where,
   orderBy,
   limit,
-  serverTimestamp,
-  runTransaction
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 
@@ -53,10 +52,13 @@ provider.setCustomParameters({
 ========================================================= */
 
 let currentUser = null;
+
 let currentHousehold = null;
+
 let currentMembers = [];
 
 let expenses = [];
+
 let contributions = [];
 
 let selectedMonth = getCurrentMonth();
@@ -65,7 +67,7 @@ let editingExpenseId = null;
 
 
 /* =========================================================
-   ELEMENTOS
+   UTILIDAD DOM
 ========================================================= */
 
 const $ = id => document.getElementById(id);
@@ -75,258 +77,94 @@ const $ = id => document.getElementById(id);
    ARRANQUE
 ========================================================= */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener(
+  "DOMContentLoaded",
+  initialiseUI
+);
 
-  initialiseUI();
-
-  onAuthStateChanged(auth, async user => {
-
-    currentUser = user;
-
-    if (!user) {
-
-      showLogin();
-
-      return;
-
-    }
-
-    try {
-
-      await initialiseUser(user);
-
-    } catch (error) {
-
-      console.error(error);
-
-      toast(
-        "No se ha podido cargar tu cuenta.",
-        true
-      );
-
-      showLogin();
-
-    }
-
-  });
-
-});
-
-
-/* =========================================================
-   INTERFAZ INICIAL
-========================================================= */
 
 function initialiseUI() {
 
-  $("googleLogin")?.addEventListener(
-    "click",
-    loginWithGoogle
-  );
+  bindEvents();
 
-  $("logout")?.addEventListener(
-    "click",
-    logout
-  );
-
-  $("settingsLogout")?.addEventListener(
-    "click",
-    logout
-  );
-
-  $("mobileMenu")?.addEventListener(
-    "click",
-    () => {
-      $("sidebar")?.classList.toggle("open");
-    }
-  );
-
-
-  /* navegación */
-
-  document
-    .querySelectorAll(".menu-item[data-page]")
-    .forEach(button => {
-
-      button.addEventListener("click", () => {
-
-        navigate(button.dataset.page);
-
-      });
-
-    });
-
-
-  document
-    .querySelectorAll("[data-go]")
-    .forEach(button => {
-
-      button.addEventListener("click", () => {
-
-        navigate(button.dataset.go);
-
-      });
-
-    });
-
-
-  /* meses */
-
-  $("monthSelector")?.addEventListener(
-    "change",
-    event => {
-
-      selectedMonth = event.target.value;
-
-      refreshDashboard();
-
-    }
-  );
-
-
-  $("previousMonth")?.addEventListener(
-    "click",
-    () => {
-
-      selectedMonth =
-        shiftMonth(selectedMonth, -1);
-
-      $("monthSelector").value =
-        selectedMonth;
-
-      refreshDashboard();
-
-    }
-  );
-
-
-  $("nextMonth")?.addEventListener(
-    "click",
-    () => {
-
-      selectedMonth =
-        shiftMonth(selectedMonth, 1);
-
-      $("monthSelector").value =
-        selectedMonth;
-
-      refreshDashboard();
-
-    }
-  );
-
-
-  /* gastos */
-
-  $("newExpense")?.addEventListener(
-    "click",
-    () => openExpenseModal()
-  );
-
-  $("expenseForm")?.addEventListener(
-    "submit",
-    saveExpense
-  );
-
-
-  $("expenseSearch")?.addEventListener(
-    "input",
-    renderExpenses
-  );
-
-  $("expenseFilter")?.addEventListener(
-    "change",
-    renderExpenses
-  );
-
-
-  /* aportaciones */
-
-  $("newContribution")?.addEventListener(
-    "click",
-    openContributionModal
-  );
-
-  $("contributionForm")?.addEventListener(
-    "submit",
-    saveContribution
-  );
-
-
-  /* hogar */
-
-  $("generateInvite")?.addEventListener(
-    "click",
-    generateInvite
-  );
-
-  $("joinHousehold")?.addEventListener(
-    "click",
-    joinHousehold
-  );
-
-
-  /* temas */
-
-  $("themeButton")?.addEventListener(
-    "click",
-    () => navigate("settings")
-  );
-
-  document
-    .querySelectorAll(".theme-option")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          setTheme(
-            button.dataset.theme
-          );
-
-        }
-      );
-
-    });
-
-
-  document
-    .querySelectorAll(".close-modal")
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        closeModals
-      );
-
-    });
-
-
-  const savedTheme =
+  setTheme(
     localStorage.getItem("finanzas-theme")
-    || "classic";
+    || "classic"
+  );
 
-  setTheme(savedTheme);
+  if ($("monthSelector")) {
+    $("monthSelector").value =
+      selectedMonth;
+  }
 
-  $("monthSelector").value =
-    selectedMonth;
+  if ($("annualYear")) {
+    $("annualYear").textContent =
+      new Date().getFullYear();
+  }
 
-  $("annualYear").textContent =
-    new Date().getFullYear();
-
+  onAuthStateChanged(
+    auth,
+    handleAuthState
+  );
 }
 
 
 /* =========================================================
-   LOGIN
+   AUTENTICACIÓN
 ========================================================= */
 
-async function loginWithGoogle() {
+async function handleAuthState(user) {
+
+  currentUser = user;
+
+  if (!user) {
+
+    showLogin();
+
+    return;
+  }
 
   try {
 
-    $("googleLogin").disabled = true;
+    showLoading();
+
+    await initialiseUser(user);
+
+    await loadHousehold();
+
+    await refreshAll();
+
+    updateUserInterface();
+
+    showApp();
+
+  } catch (error) {
+
+    console.error(
+      "Error inicializando usuario:",
+      error
+    );
+
+    showLogin();
+
+    toast(
+      getFirebaseErrorMessage(error),
+      true
+    );
+  }
+}
+
+
+async function loginWithGoogle() {
+
+  const button =
+    $("googleLogin");
+
+  try {
+
+    if (button) {
+      button.disabled = true;
+    }
 
     await signInWithPopup(
       auth,
@@ -335,7 +173,10 @@ async function loginWithGoogle() {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Error login:",
+      error
+    );
 
     if (
       error.code !==
@@ -343,18 +184,17 @@ async function loginWithGoogle() {
     ) {
 
       toast(
-        "No se ha podido iniciar sesión.",
+        getFirebaseErrorMessage(error),
         true
       );
-
     }
 
   } finally {
 
-    $("googleLogin").disabled = false;
-
+    if (button) {
+      button.disabled = false;
+    }
   }
-
 }
 
 
@@ -365,25 +205,29 @@ async function logout() {
     await signOut(auth);
 
     currentUser = null;
+
     currentHousehold = null;
+
     currentMembers = [];
 
     expenses = [];
+
     contributions = [];
 
     showLogin();
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Error cerrando sesión:",
+      error
+    );
 
     toast(
       "No se ha podido cerrar la sesión.",
       true
     );
-
   }
-
 }
 
 
@@ -393,115 +237,119 @@ async function logout() {
 
 async function initialiseUser(user) {
 
-  showLoading();
-
   const userRef =
-    doc(db, "users", user.uid);
+    doc(
+      db,
+      "users",
+      user.uid
+    );
 
-  const userSnap =
+  const userSnapshot =
     await getDoc(userRef);
 
-  if (!userSnap.exists()) {
 
-    await setDoc(userRef, {
+  const userData = {
 
-      uid: user.uid,
+    uid:
+      user.uid,
 
-      name:
-        user.displayName
-        || "Usuario",
+    name:
+      user.displayName ||
+      "Usuario",
 
-      email:
-        user.email
-        || "",
+    email:
+      user.email ||
+      "",
 
-      photo:
-        user.photoURL
-        || "",
+    photo:
+      user.photoURL ||
+      "",
 
-      createdAt:
-        serverTimestamp()
+    updatedAt:
+      serverTimestamp()
+  };
 
-    });
+
+  if (!userSnapshot.exists()) {
+
+    await setDoc(
+      userRef,
+      {
+        ...userData,
+        createdAt:
+          serverTimestamp()
+      }
+    );
 
   } else {
 
     await setDoc(
       userRef,
-      {
-
-        name:
-          user.displayName
-          || "Usuario",
-
-        email:
-          user.email
-          || "",
-
-        photo:
-          user.photoURL
-          || ""
-
-      },
+      userData,
       {
         merge: true
       }
     );
-
   }
 
 
-  /* Buscar hogares del usuario */
+  /*
+    Buscar si el usuario pertenece
+    a algún hogar.
+  */
 
-  const householdsQuery = query(
-    collection(db, "households"),
-    where(
-      "memberIds",
-      "array-contains",
-      user.uid
-    ),
-    limit(1)
-  );
+  const householdsQuery =
+    query(
+      collection(
+        db,
+        "households"
+      ),
+      where(
+        "memberIds",
+        "array-contains",
+        user.uid
+      ),
+      limit(1)
+    );
 
-  const householdSnapshot =
+
+  const snapshot =
     await getDocs(
       householdsQuery
     );
 
 
-  if (!householdSnapshot.empty) {
+  if (!snapshot.empty) {
 
     currentHousehold =
-      householdSnapshot.docs[0];
+      snapshot.docs[0];
 
   } else {
 
-    /*
-      No tiene hogar todavía.
-      Se crea automáticamente.
-    */
-
     currentHousehold =
       await createHousehold(user);
-
   }
-
-
-  await loadHousehold();
-
-  showApp();
-
-  await refreshAll();
-
 }
 
+
+/* =========================================================
+   CREAR HOGAR
+========================================================= */
 
 async function createHousehold(user) {
 
   const householdRef =
     doc(
-      collection(db, "households")
+      collection(
+        db,
+        "households"
+      )
     );
+
+
+  const inviteCode =
+    await createUniqueInviteCode();
+
 
   const memberRef =
     doc(
@@ -511,9 +359,6 @@ async function createHousehold(user) {
       "members",
       user.uid
     );
-
-  const inviteCode =
-    await createUniqueInviteCode();
 
 
   await setDoc(
@@ -526,14 +371,16 @@ async function createHousehold(user) {
       name:
         "Mi hogar",
 
-      inviteCode,
+      inviteCode:
+        inviteCode,
 
       memberIds:
-        [user.uid],
+        [
+          user.uid
+        ],
 
       createdAt:
         serverTimestamp()
-
     }
   );
 
@@ -546,66 +393,121 @@ async function createHousehold(user) {
         user.uid,
 
       name:
-        user.displayName
-        || "Usuario",
+        user.displayName ||
+        "Usuario",
 
       email:
-        user.email
-        || "",
+        user.email ||
+        "",
 
       photo:
-        user.photoURL
-        || "",
+        user.photoURL ||
+        "",
 
       role:
         "owner",
 
       joinedAt:
         serverTimestamp()
-
     }
   );
 
 
+  /*
+    Guardamos el código de invitación.
+  */
+
   await setDoc(
-  memberRef,
-  {
+    doc(
+      db,
+      "joinCodes",
+      inviteCode
+    ),
+    {
 
-    uid:
-      currentUser.uid,
+      householdId:
+        householdRef.id,
 
-    name:
-      currentUser.displayName
-      || "Usuario",
-
-    email:
-      currentUser.email
-      || "",
-
-    photo:
-      currentUser.photoURL
-      || "",
-
-    role:
-      "member",
-
-    inviteCode:
-      code,
-
-    joinedAt:
-      serverTimestamp()
-
-  }
-);
+      createdAt:
+        serverTimestamp()
+    }
+  );
 
 
-  return householdRef;
+  /*
+    Devolvemos el DocumentReference.
+  */
 
+  return await getDoc(
+    householdRef
+  );
 }
 
 
 /* =========================================================
-   HOGAR
+   CÓDIGO INVITACIÓN
+========================================================= */
+
+async function createUniqueInviteCode() {
+
+  const characters =
+    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+
+  for (
+    let attempt = 0;
+    attempt < 20;
+    attempt++
+  ) {
+
+    let code = "";
+
+
+    for (
+      let i = 0;
+      i < 6;
+      i++
+    ) {
+
+      code +=
+        characters[
+          Math.floor(
+            Math.random() *
+            characters.length
+          )
+        ];
+    }
+
+
+    const codeRef =
+      doc(
+        db,
+        "joinCodes",
+        code
+      );
+
+
+    const snapshot =
+      await getDoc(
+        codeRef
+      );
+
+
+    if (!snapshot.exists()) {
+
+      return code;
+    }
+  }
+
+
+  throw new Error(
+    "No se ha podido generar un código de invitación."
+  );
+}
+
+
+/* =========================================================
+   CARGAR HOGAR
 ========================================================= */
 
 async function loadHousehold() {
@@ -614,35 +516,47 @@ async function loadHousehold() {
     return;
   }
 
-  const householdSnap =
-    await getDoc(currentHousehold.ref);
 
-  if (!householdSnap.exists()) {
+  const householdSnapshot =
+    await getDoc(
+      currentHousehold.ref
+    );
+
+
+  if (!householdSnapshot.exists()) {
+
     throw new Error(
       "El hogar no existe."
     );
   }
 
+
   currentHousehold =
-    householdSnap;
+    householdSnapshot;
+
+
+  const membersRef =
+    collection(
+      db,
+      "households",
+      currentHousehold.id,
+      "members"
+    );
 
 
   const membersSnapshot =
     await getDocs(
-      collection(
-        db,
-        "households",
-        currentHousehold.id,
-        "members"
-      )
+      membersRef
     );
 
 
   currentMembers =
     membersSnapshot.docs.map(
-      item => ({
-        id: item.id,
-        ...item.data()
+      member => ({
+        id:
+          member.id,
+
+        ...member.data()
       })
     );
 
@@ -651,12 +565,19 @@ async function loadHousehold() {
 
   populateMemberSelectors();
 
-  $("inviteCode").textContent =
-    currentHousehold.data().inviteCode
-    || "—";
 
+  if ($("inviteCode")) {
+
+    $("inviteCode").textContent =
+      currentHousehold.data().inviteCode
+      || "------";
+  }
 }
 
+
+/* =========================================================
+   INVITACIÓN
+========================================================= */
 
 async function generateInvite() {
 
@@ -664,37 +585,38 @@ async function generateInvite() {
     return;
   }
 
+
   try {
 
-    const code =
+    const newCode =
       await createUniqueInviteCode();
 
+
     const oldCode =
-      currentHousehold.data().inviteCode;
+      currentHousehold.data()
+        ?.inviteCode;
 
 
     await updateDoc(
       currentHousehold.ref,
       {
-        inviteCode: code
+        inviteCode:
+          newCode
       }
     );
 
 
     if (oldCode) {
 
-      try {
-
-        await deleteDoc(
-          doc(
-            db,
-            "joinCodes",
-            oldCode
-          )
-        );
-
-      } catch (_) {}
-
+      await deleteDoc(
+        doc(
+          db,
+          "joinCodes",
+          oldCode
+        )
+      ).catch(
+        () => {}
+      );
     }
 
 
@@ -702,9 +624,10 @@ async function generateInvite() {
       doc(
         db,
         "joinCodes",
-        code
+        newCode
       ),
       {
+
         householdId:
           currentHousehold.id,
 
@@ -714,8 +637,18 @@ async function generateInvite() {
     );
 
 
-    $("inviteCode").textContent =
-      code;
+    currentHousehold =
+      await getDoc(
+        currentHousehold.ref
+      );
+
+
+    if ($("inviteCode")) {
+
+      $("inviteCode").textContent =
+        newCode;
+    }
+
 
     toast(
       "Nuevo código generado."
@@ -726,35 +659,42 @@ async function generateInvite() {
     console.error(error);
 
     toast(
-      "No se ha podido generar el código.",
+      getFirebaseErrorMessage(error),
       true
     );
-
   }
-
 }
 
 
+/* =========================================================
+   UNIRSE A HOGAR
+========================================================= */
+
 async function joinHousehold() {
+
+  if (!currentUser) {
+    return;
+  }
+
 
   const input =
     $("joinCode");
 
+
   const code =
-    input.value
-      .trim()
-      .toUpperCase();
+    input?.value
+      ?.trim()
+      ?.toUpperCase();
 
 
   if (!code) {
 
     toast(
-      "Introduce un código.",
+      "Introduce el código de invitación.",
       true
     );
 
     return;
-
   }
 
 
@@ -766,37 +706,39 @@ async function joinHousehold() {
     );
 
     return;
-
   }
 
 
   try {
 
-    const joinRef =
+    const joinCodeRef =
       doc(
         db,
         "joinCodes",
         code
       );
 
-    const joinSnap =
-      await getDoc(joinRef);
+
+    const joinSnapshot =
+      await getDoc(
+        joinCodeRef
+      );
 
 
-    if (!joinSnap.exists()) {
+    if (!joinSnapshot.exists()) {
 
       toast(
-        "El código no es válido.",
+        "El código no existe o ha caducado.",
         true
       );
 
       return;
-
     }
 
 
     const householdId =
-      joinSnap.data().householdId;
+      joinSnapshot.data()
+        .householdId;
 
 
     const householdRef =
@@ -807,72 +749,100 @@ async function joinHousehold() {
       );
 
 
-    const memberRef =
+    const householdSnapshot =
+      await getDoc(
+        householdRef
+      );
+
+
+    if (!householdSnapshot.exists()) {
+
+      toast(
+        "El hogar no existe.",
+        true
+      );
+
+      return;
+    }
+
+
+    const householdData =
+      householdSnapshot.data();
+
+
+    const memberIds =
+      Array.isArray(
+        householdData.memberIds
+      )
+        ? householdData.memberIds
+        : [];
+
+
+    if (
+      !memberIds.includes(
+        currentUser.uid
+      )
+    ) {
+
+      memberIds.push(
+        currentUser.uid
+      );
+
+
+      await updateDoc(
+        householdRef,
+        {
+          memberIds:
+            memberIds
+        }
+      );
+    }
+
+
+    await setDoc(
       doc(
         db,
         "households",
         householdId,
         "members",
         currentUser.uid
-      );
-
-
-    await setDoc(
-      memberRef,
+      ),
       {
 
         uid:
           currentUser.uid,
 
         name:
-          currentUser.displayName
-          || "Usuario",
+          currentUser.displayName ||
+          "Usuario",
 
         email:
-          currentUser.email
-          || "",
+          currentUser.email ||
+          "",
 
         photo:
-          currentUser.photoURL
-          || "",
+          currentUser.photoURL ||
+          "",
 
         role:
           "member",
 
         joinedAt:
           serverTimestamp()
-
       }
     );
 
 
-    const householdSnap =
-      await getDoc(householdRef);
-
-
-    const memberIds =
-      householdSnap.data().memberIds
-      || [];
-
-
-    if (!memberIds.includes(currentUser.uid)) {
-
-      await updateDoc(
-        householdRef,
-        {
-          memberIds:
-            [...memberIds, currentUser.uid]
-        }
+    currentHousehold =
+      await getDoc(
+        householdRef
       );
 
+
+    if (input) {
+      input.value = "";
     }
 
-
-    currentHousehold =
-      householdSnap;
-
-
-    input.value = "";
 
     await loadHousehold();
 
@@ -882,66 +852,23 @@ async function joinHousehold() {
       "Te has unido al hogar correctamente."
     );
 
-  } catch (error) {
 
-    console.error(error);
-
-    toast(
-      "No se ha podido unir al hogar.",
-      true
+    navigate(
+      "dashboard"
     );
 
+  } catch (error) {
+
+    console.error(
+      "Error uniéndose al hogar:",
+      error
+    );
+
+    toast(
+      getFirebaseErrorMessage(error),
+      true
+    );
   }
-
-}
-
-
-async function createUniqueInviteCode() {
-
-  const characters =
-    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-
-  for (let attempt = 0; attempt < 10; attempt++) {
-
-    let code = "";
-
-    for (let i = 0; i < 6; i++) {
-
-      code +=
-        characters[
-          Math.floor(
-            Math.random()
-            * characters.length
-          )
-        ];
-
-    }
-
-
-    const ref =
-      doc(
-        db,
-        "joinCodes",
-        code
-      );
-
-    const snap =
-      await getDoc(ref);
-
-
-    if (!snap.exists()) {
-
-      return code;
-
-    }
-
-  }
-
-  throw new Error(
-    "No se pudo generar un código único."
-  );
-
 }
 
 
@@ -956,7 +883,7 @@ async function loadExpenses() {
   }
 
 
-  const ref =
+  const expensesRef =
     collection(
       db,
       "households",
@@ -968,7 +895,7 @@ async function loadExpenses() {
   const snapshot =
     await getDocs(
       query(
-        ref,
+        expensesRef,
         orderBy(
           "date",
           "desc"
@@ -989,7 +916,6 @@ async function loadExpenses() {
 
 
   renderExpenses();
-
 }
 
 
@@ -999,31 +925,50 @@ async function saveExpense(event) {
 
 
   if (!currentHousehold) {
+
+    toast(
+      "No hay un hogar activo.",
+      true
+    );
+
     return;
   }
 
 
   const concept =
     $("expenseConcept")
-      .value
-      .trim();
+      ?.value
+      ?.trim();
+
 
   const amount =
     Number(
-      $("expenseAmount").value
+      $("expenseAmount")
+        ?.value
     );
 
+
   const date =
-    $("expenseDate").value;
+    $("expenseDate")
+      ?.value;
+
 
   const type =
-    $("expenseType").value;
+    $("expenseType")
+      ?.value
+      || "common";
 
-  const memberId =
-    $("expenseMember").value;
 
   const category =
-    $("expenseCategory").value;
+    $("expenseCategory")
+      ?.value
+      || "Otros";
+
+
+  const memberId =
+    $("expenseMember")
+      ?.value
+      || currentUser.uid;
 
 
   if (!concept) {
@@ -1034,11 +979,13 @@ async function saveExpense(event) {
     );
 
     return;
-
   }
 
 
-  if (!amount || amount <= 0) {
+  if (
+    !Number.isFinite(amount)
+    || amount <= 0
+  ) {
 
     toast(
       "Introduce un importe válido.",
@@ -1046,7 +993,6 @@ async function saveExpense(event) {
     );
 
     return;
-
   }
 
 
@@ -1058,7 +1004,6 @@ async function saveExpense(event) {
     );
 
     return;
-
   }
 
 
@@ -1066,21 +1011,26 @@ async function saveExpense(event) {
 
     const data = {
 
-      concept,
+      concept:
+        concept,
 
-      amount,
+      amount:
+        amount,
 
-      date,
+      date:
+        date,
 
-      type,
+      type:
+        type,
 
-      category,
+      category:
+        category,
 
-      memberId,
+      memberId:
+        memberId,
 
       updatedAt:
         serverTimestamp()
-
     };
 
 
@@ -1103,6 +1053,7 @@ async function saveExpense(event) {
         data
       );
 
+
       toast(
         "Gasto actualizado."
       );
@@ -1120,20 +1071,22 @@ async function saveExpense(event) {
 
           createdAt:
             serverTimestamp()
-
         }
       );
+
 
       toast(
         "Gasto guardado."
       );
-
     }
+
+
+    editingExpenseId =
+      null;
 
 
     closeModals();
 
-    editingExpenseId = null;
 
     await loadExpenses();
 
@@ -1144,70 +1097,93 @@ async function saveExpense(event) {
     console.error(error);
 
     toast(
-      "No se ha podido guardar el gasto.",
+      getFirebaseErrorMessage(error),
       true
     );
-
   }
-
 }
 
 
-function openExpenseModal(expense = null) {
-
-  const modal =
-    $("expenseModal");
-
+function openExpenseModal(
+  expense = null
+) {
 
   editingExpenseId =
-    expense
-      ? expense.id
-      : null;
+    expense?.id
+    || null;
 
 
-  $("expenseModalTitle").textContent =
-    expense
-      ? "Editar gasto"
-      : "Nuevo gasto";
+  if ($("expenseModalTitle")) {
+
+    $("expenseModalTitle")
+      .textContent =
+        expense
+          ? "Editar gasto"
+          : "Nuevo gasto";
+  }
 
 
-  $("expenseId").value =
-    expense?.id || "";
+  if ($("expenseId")) {
+
+    $("expenseId").value =
+      expense?.id
+      || "";
+  }
 
 
-  $("expenseConcept").value =
-    expense?.concept || "";
+  if ($("expenseConcept")) {
+
+    $("expenseConcept").value =
+      expense?.concept
+      || "";
+  }
 
 
-  $("expenseAmount").value =
-    expense?.amount ?? "";
+  if ($("expenseAmount")) {
+
+    $("expenseAmount").value =
+      expense?.amount
+      ?? "";
+  }
 
 
-  $("expenseDate").value =
-    expense?.date
-    || getToday();
+  if ($("expenseDate")) {
+
+    $("expenseDate").value =
+      expense?.date
+      || getToday();
+  }
 
 
-  $("expenseType").value =
-    expense?.type
-    || "common";
+  if ($("expenseType")) {
+
+    $("expenseType").value =
+      expense?.type
+      || "common";
+  }
 
 
-  $("expenseCategory").value =
-    expense?.category
-    || "Otros";
+  if ($("expenseCategory")) {
+
+    $("expenseCategory").value =
+      expense?.category
+      || "Otros";
+  }
 
 
   populateMemberSelectors();
 
 
-  $("expenseMember").value =
-    expense?.memberId
-    || currentUser.uid;
+  if ($("expenseMember")) {
+
+    $("expenseMember").value =
+      expense?.memberId
+      || currentUser.uid;
+  }
 
 
-  modal.showModal();
-
+  $("expenseModal")
+    ?.showModal();
 }
 
 
@@ -1215,7 +1191,8 @@ async function deleteExpense(id) {
 
   const expense =
     expenses.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
 
@@ -1225,8 +1202,8 @@ async function deleteExpense(id) {
 
 
   const confirmed =
-    confirm(
-      `¿Eliminar el gasto "${expense.concept}" de ${formatMoney(expense.amount)}?`
+    window.confirm(
+      `¿Quieres eliminar el gasto "${expense.concept}" de ${formatMoney(expense.amount)}?`
     );
 
 
@@ -1262,12 +1239,10 @@ async function deleteExpense(id) {
     console.error(error);
 
     toast(
-      "No se ha podido eliminar el gasto.",
+      getFirebaseErrorMessage(error),
       true
     );
-
   }
-
 }
 
 
@@ -1276,23 +1251,24 @@ function renderExpenses() {
   const tbody =
     $("expensesTable");
 
+
   if (!tbody) {
     return;
   }
 
 
   const search =
-    (
-      $("expenseSearch")?.value
-      || ""
-    )
-      .trim()
-      .toLowerCase();
+    $("expenseSearch")
+      ?.value
+      ?.trim()
+      ?.toLowerCase()
+      || "";
 
 
   const filter =
-    $("expenseFilter")?.value
-    || "all";
+    $("expenseFilter")
+      ?.value
+      || "all";
 
 
   let data =
@@ -1302,20 +1278,23 @@ function renderExpenses() {
   if (search) {
 
     data =
-      data.filter(item =>
-        String(
-          item.concept || ""
-        )
-          .toLowerCase()
-          .includes(search)
-        ||
-        String(
-          item.category || ""
-        )
-          .toLowerCase()
-          .includes(search)
-      );
+      data.filter(
+        item =>
 
+          String(
+            item.concept || ""
+          )
+            .toLowerCase()
+            .includes(search)
+
+          ||
+
+          String(
+            item.category || ""
+          )
+            .toLowerCase()
+            .includes(search)
+      );
   }
 
 
@@ -1326,7 +1305,6 @@ function renderExpenses() {
         item =>
           item.type === filter
       );
-
   }
 
 
@@ -1341,118 +1319,139 @@ function renderExpenses() {
     `;
 
     return;
-
   }
 
 
   tbody.innerHTML =
-    data.map(expense => {
+    data.map(
+      expense => {
 
-      const member =
-        getMember(expense.memberId);
+        const member =
+          getMember(
+            expense.memberId
+          );
 
 
-      return `
-        <tr>
+        return `
+          <tr>
 
-          <td>
-            ${formatDate(expense.date)}
-          </td>
+            <td>
+              ${formatDate(
+                expense.date
+              )}
+            </td>
 
-          <td>
-            <strong>
-              ${escapeHtml(expense.concept)}
-            </strong>
-          </td>
+            <td>
+              <strong>
+                ${escapeHtml(
+                  expense.concept
+                )}
+              </strong>
+            </td>
 
-          <td>
-            ${escapeHtml(expense.category || "Otros")}
-          </td>
+            <td>
+              ${escapeHtml(
+                expense.category
+                || "Otros"
+              )}
+            </td>
 
-          <td>
-            <span class="badge">
-              ${
-                expense.type === "common"
-                  ? "Común"
-                  : "Individual"
-              }
-            </span>
-          </td>
+            <td>
+              <span class="badge">
+                ${
+                  expense.type === "common"
+                    ? "Común"
+                    : "Individual"
+                }
+              </span>
+            </td>
 
-          <td>
-            ${escapeHtml(
-              member?.name || "Usuario"
-            )}
-          </td>
+            <td>
+              ${escapeHtml(
+                member?.name
+                || "Usuario"
+              )}
+            </td>
 
-          <td class="amount">
-            ${formatMoney(expense.amount)}
-          </td>
+            <td class="amount">
+              ${formatMoney(
+                expense.amount
+              )}
+            </td>
 
-          <td class="actions">
+            <td class="actions">
 
-            <button
-              title="Editar"
-              data-edit-expense="${expense.id}">
-              ✏️
-            </button>
+              <button
+                type="button"
+                title="Editar"
+                data-edit-expense="${escapeAttribute(expense.id)}">
+                ✏️
+              </button>
 
-            <button
-              class="delete-button"
-              title="Eliminar"
-              data-delete-expense="${expense.id}">
-              🗑️
-            </button>
+              <button
+                type="button"
+                class="delete-button"
+                title="Eliminar"
+                data-delete-expense="${escapeAttribute(expense.id)}">
+                🗑️
+              </button>
 
-          </td>
+            </td>
 
-        </tr>
-      `;
-
-    }).join("");
+          </tr>
+        `;
+      }
+    ).join("");
 
 
   tbody
     .querySelectorAll(
       "[data-edit-expense]"
     )
-    .forEach(button => {
+    .forEach(
+      button => {
 
-      button.addEventListener(
-        "click",
-        () => {
+        button.addEventListener(
+          "click",
+          () => {
 
-          const expense =
-            expenses.find(
-              item =>
-                item.id ===
-                button.dataset.editExpense
-            );
+            const expense =
+              expenses.find(
+                item =>
+                  item.id ===
+                  button.dataset
+                    .editExpense
+              );
 
-          openExpenseModal(expense);
 
-        }
-      );
-
-    });
+            if (expense) {
+              openExpenseModal(
+                expense
+              );
+            }
+          }
+        );
+      }
+    );
 
 
   tbody
     .querySelectorAll(
       "[data-delete-expense]"
     )
-    .forEach(button => {
+    .forEach(
+      button => {
 
-      button.addEventListener(
-        "click",
-        () =>
-          deleteExpense(
-            button.dataset.deleteExpense
-          )
-      );
-
-    });
-
+        button.addEventListener(
+          "click",
+          () =>
+            deleteExpense(
+              button.dataset
+                .deleteExpense
+            )
+        );
+      }
+    );
 }
 
 
@@ -1467,7 +1466,7 @@ async function loadContributions() {
   }
 
 
-  const ref =
+  const contributionsRef =
     collection(
       db,
       "households",
@@ -1479,7 +1478,7 @@ async function loadContributions() {
   const snapshot =
     await getDocs(
       query(
-        ref,
+        contributionsRef,
         orderBy(
           "date",
           "desc"
@@ -1500,7 +1499,6 @@ async function loadContributions() {
 
 
   renderContributions();
-
 }
 
 
@@ -1508,48 +1506,87 @@ function openContributionModal() {
 
   populateMemberSelectors();
 
-  $("contributionDate").value =
-    getToday();
 
-  $("contributionAmount").value =
-    "";
+  if ($("contributionDate")) {
 
-  $("contributionConcept").value =
-    "Aportación mensual";
+    $("contributionDate").value =
+      getToday();
+  }
 
-  $("contributionMember").value =
-    currentUser.uid;
+
+  if ($("contributionAmount")) {
+
+    $("contributionAmount").value =
+      "";
+  }
+
+
+  if ($("contributionConcept")) {
+
+    $("contributionConcept").value =
+      "Aportación mensual";
+  }
+
+
+  if ($("contributionMember")) {
+
+    $("contributionMember").value =
+      currentUser.uid;
+  }
 
 
   $("contributionModal")
-    .showModal();
-
+    ?.showModal();
 }
 
 
-async function saveContribution(event) {
+async function saveContribution(
+  event
+) {
 
   event.preventDefault();
 
 
+  if (!currentHousehold) {
+
+    toast(
+      "No hay un hogar activo.",
+      true
+    );
+
+    return;
+  }
+
+
   const memberId =
-    $("contributionMember").value;
+    $("contributionMember")
+      ?.value
+      || currentUser.uid;
+
 
   const amount =
     Number(
-      $("contributionAmount").value
+      $("contributionAmount")
+        ?.value
     );
 
+
   const date =
-    $("contributionDate").value;
+    $("contributionDate")
+      ?.value;
+
 
   const concept =
     $("contributionConcept")
-      .value
-      .trim();
+      ?.value
+      ?.trim()
+      || "Aportación";
 
 
-  if (!amount || amount <= 0) {
+  if (
+    !Number.isFinite(amount)
+    || amount <= 0
+  ) {
 
     toast(
       "Introduce un importe válido.",
@@ -1557,7 +1594,6 @@ async function saveContribution(event) {
     );
 
     return;
-
   }
 
 
@@ -1569,7 +1605,6 @@ async function saveContribution(event) {
     );
 
     return;
-
   }
 
 
@@ -1584,26 +1619,29 @@ async function saveContribution(event) {
       ),
       {
 
-        memberId,
+        memberId:
+          memberId,
 
-        amount,
+        amount:
+          amount,
 
-        date,
+        date:
+          date,
 
         concept:
-          concept || "Aportación",
+          concept,
 
         createdBy:
           currentUser.uid,
 
         createdAt:
           serverTimestamp()
-
       }
     );
 
 
     closeModals();
+
 
     toast(
       "Aportación guardada."
@@ -1619,12 +1657,10 @@ async function saveContribution(event) {
     console.error(error);
 
     toast(
-      "No se ha podido guardar la aportación.",
+      getFirebaseErrorMessage(error),
       true
     );
-
   }
-
 }
 
 
@@ -1632,6 +1668,7 @@ function renderContributions() {
 
   const tbody =
     $("contributionsTable");
+
 
   if (!tbody) {
     return;
@@ -1649,81 +1686,94 @@ function renderContributions() {
     `;
 
     return;
-
   }
 
 
   tbody.innerHTML =
-    contributions.map(item => {
+    contributions.map(
+      contribution => {
 
-      const member =
-        getMember(item.memberId);
+        const member =
+          getMember(
+            contribution.memberId
+          );
 
 
-      return `
-        <tr>
+        return `
+          <tr>
 
-          <td>
-            ${formatDate(item.date)}
-          </td>
+            <td>
+              ${formatDate(
+                contribution.date
+              )}
+            </td>
 
-          <td>
-            ${escapeHtml(
-              member?.name || "Usuario"
-            )}
-          </td>
+            <td>
+              ${escapeHtml(
+                member?.name
+                || "Usuario"
+              )}
+            </td>
 
-          <td>
-            ${escapeHtml(
-              item.concept || "Aportación"
-            )}
-          </td>
+            <td>
+              ${escapeHtml(
+                contribution.concept
+                || "Aportación"
+              )}
+            </td>
 
-          <td class="amount">
-            ${formatMoney(item.amount)}
-          </td>
+            <td class="amount">
+              ${formatMoney(
+                contribution.amount
+              )}
+            </td>
 
-          <td class="actions">
+            <td class="actions">
 
-            <button
-              class="delete-button"
-              data-delete-contribution="${item.id}"
-              title="Eliminar">
-              🗑️
-            </button>
+              <button
+                type="button"
+                class="delete-button"
+                title="Eliminar"
+                data-delete-contribution="${escapeAttribute(contribution.id)}">
+                🗑️
+              </button>
 
-          </td>
+            </td>
 
-        </tr>
-      `;
-
-    }).join("");
+          </tr>
+        `;
+      }
+    ).join("");
 
 
   tbody
     .querySelectorAll(
       "[data-delete-contribution]"
     )
-    .forEach(button => {
+    .forEach(
+      button => {
 
-      button.addEventListener(
-        "click",
-        () =>
-          deleteContribution(
-            button.dataset.deleteContribution
-          )
-      );
-
-    });
-
+        button.addEventListener(
+          "click",
+          () =>
+            deleteContribution(
+              button.dataset
+                .deleteContribution
+            )
+        );
+      }
+    );
 }
 
 
-async function deleteContribution(id) {
+async function deleteContribution(
+  id
+) {
 
   const contribution =
     contributions.find(
-      item => item.id === id
+      item =>
+        item.id === id
     );
 
 
@@ -1733,13 +1783,12 @@ async function deleteContribution(id) {
 
 
   if (
-    !confirm(
-      `¿Eliminar esta aportación de ${formatMoney(contribution.amount)}?`
+    !window.confirm(
+      `¿Quieres eliminar esta aportación de ${formatMoney(contribution.amount)}?`
     )
   ) {
 
     return;
-
   }
 
 
@@ -1770,30 +1819,16 @@ async function deleteContribution(id) {
     console.error(error);
 
     toast(
-      "No se ha podido eliminar.",
+      getFirebaseErrorMessage(error),
       true
     );
-
   }
-
 }
 
 
 /* =========================================================
    DASHBOARD
 ========================================================= */
-
-async function refreshAll() {
-
-  await Promise.all([
-    loadExpenses(),
-    loadContributions()
-  ]);
-
-  refreshDashboard();
-
-}
-
 
 function refreshDashboard() {
 
@@ -1808,16 +1843,20 @@ function refreshDashboard() {
 
   const monthExpenses =
     expenses.filter(
-      item =>
-        String(item.date || "")
+      expense =>
+        String(
+          expense.date || ""
+        )
           .startsWith(month)
     );
 
 
   const monthContributions =
     contributions.filter(
-      item =>
-        String(item.date || "")
+      contribution =>
+        String(
+          contribution.date || ""
+        )
           .startsWith(month)
     );
 
@@ -1825,8 +1864,8 @@ function refreshDashboard() {
   const common =
     sum(
       monthExpenses.filter(
-        item =>
-          item.type === "common"
+        expense =>
+          expense.type === "common"
       )
     );
 
@@ -1834,8 +1873,8 @@ function refreshDashboard() {
   const individual =
     sum(
       monthExpenses.filter(
-        item =>
-          item.type === "individual"
+        expense =>
+          expense.type === "individual"
       )
     );
 
@@ -1846,62 +1885,102 @@ function refreshDashboard() {
     );
 
 
+  /*
+    AHORRO COMÚN =
+    APORTACIONES - GASTOS COMUNES
+  */
+
   const saving =
-    contributed - common;
+    contributed -
+    common;
 
 
-  $("dashboardContributions")
-    .textContent =
-      formatMoney(contributed);
+  setText(
+    "dashboardContributions",
+    formatMoney(
+      contributed
+    )
+  );
 
 
-  $("dashboardCommon")
-    .textContent =
-      formatMoney(common);
+  setText(
+    "dashboardCommon",
+    formatMoney(
+      common
+    )
+  );
 
 
-  $("dashboardIndividual")
-    .textContent =
-      formatMoney(individual);
+  setText(
+    "dashboardIndividual",
+    formatMoney(
+      individual
+    )
+  );
 
 
-  $("dashboardSaving")
-    .textContent =
-      formatMoney(saving);
+  setText(
+    "dashboardSaving",
+    formatMoney(
+      saving
+    )
+  );
 
 
-  $("commonBarValue")
-    .textContent =
-      formatMoney(common);
+  setText(
+    "commonBarValue",
+    formatMoney(
+      common
+    )
+  );
 
 
-  $("individualBarValue")
-    .textContent =
-      formatMoney(individual);
+  setText(
+    "individualBarValue",
+    formatMoney(
+      individual
+    )
+  );
 
 
-  $("savingBarValue")
-    .textContent =
-      formatMoney(saving);
+  setText(
+    "savingBarValue",
+    formatMoney(
+      saving
+    )
+  );
 
 
-  const totalBase =
+  setText(
+    "currentPeriodLabel",
+    formatMonth(
+      month
+    )
+  );
+
+
+  const base =
     Math.max(
       contributed,
-      common + individual + Math.max(saving, 0),
+      common +
+      individual +
+      Math.max(
+        saving,
+        0
+      ),
       1
     );
 
 
   setWidth(
     "commonBar",
-    common / totalBase * 100
+    common / base * 100
   );
 
 
   setWidth(
     "individualBar",
-    individual / totalBase * 100
+    individual / base * 100
   );
 
 
@@ -1910,43 +1989,42 @@ function refreshDashboard() {
     Math.max(
       saving,
       0
-    ) / totalBase * 100
+    ) / base * 100
   );
-
-
-  $("currentPeriodLabel")
-    .textContent =
-      formatMonth(month);
 
 
   refreshAnnual();
 
   renderRecentMovements();
-
 }
 
 
 function refreshAnnual() {
 
   const year =
-    selectedMonth.substring(
-      0,
-      4
-    );
+    selectedMonth
+      .substring(
+        0,
+        4
+      );
 
 
   const yearExpenses =
     expenses.filter(
-      item =>
-        String(item.date || "")
+      expense =>
+        String(
+          expense.date || ""
+        )
           .startsWith(year)
     );
 
 
   const yearContributions =
     contributions.filter(
-      item =>
-        String(item.date || "")
+      contribution =>
+        String(
+          contribution.date || ""
+        )
           .startsWith(year)
     );
 
@@ -1960,8 +2038,8 @@ function refreshAnnual() {
   const common =
     sum(
       yearExpenses.filter(
-        item =>
-          item.type === "common"
+        expense =>
+          expense.type === "common"
       )
     );
 
@@ -1969,40 +2047,53 @@ function refreshAnnual() {
   const individual =
     sum(
       yearExpenses.filter(
-        item =>
-          item.type === "individual"
+        expense =>
+          expense.type === "individual"
       )
     );
 
 
   const saving =
-    contributed - common;
+    contributed -
+    common;
 
 
-  $("annualYear")
-    .textContent =
-      year;
+  setText(
+    "annualYear",
+    year
+  );
 
 
-  $("annualContributions")
-    .textContent =
-      formatMoney(contributed);
+  setText(
+    "annualContributions",
+    formatMoney(
+      contributed
+    )
+  );
 
 
-  $("annualCommon")
-    .textContent =
-      formatMoney(common);
+  setText(
+    "annualCommon",
+    formatMoney(
+      common
+    )
+  );
 
 
-  $("annualIndividual")
-    .textContent =
-      formatMoney(individual);
+  setText(
+    "annualIndividual",
+    formatMoney(
+      individual
+    )
+  );
 
 
-  $("annualSaving")
-    .textContent =
-      formatMoney(saving);
-
+  setText(
+    "annualSaving",
+    formatMoney(
+      saving
+    )
+  );
 }
 
 
@@ -2019,35 +2110,50 @@ function renderRecentMovements() {
 
   const movements = [
 
-    ...expenses.map(item => ({
-      ...item,
+    ...expenses.map(
+      expense => ({
 
-      movementType:
-        "expense",
+        ...expense,
 
-      movementDate:
-        item.date
-    })),
+        movementType:
+          "expense",
 
-    ...contributions.map(item => ({
-      ...item,
+        movementDate:
+          expense.date
 
-      movementType:
-        "contribution",
+      })
+    ),
 
-      movementDate:
-        item.date
-    }))
+    ...contributions.map(
+      contribution => ({
+
+        ...contribution,
+
+        movementType:
+          "contribution",
+
+        movementDate:
+          contribution.date
+
+      })
+    )
 
   ]
     .sort(
-      (a,b) =>
-        String(b.movementDate)
+      (a, b) =>
+        String(
+          b.movementDate
+        )
           .localeCompare(
-            String(a.movementDate)
+            String(
+              a.movementDate
+            )
           )
     )
-    .slice(0, 8);
+    .slice(
+      0,
+      8
+    );
 
 
   if (!movements.length) {
@@ -2059,70 +2165,69 @@ function renderRecentMovements() {
     `;
 
     return;
-
   }
 
 
   container.innerHTML =
-    movements.map(item => {
+    movements.map(
+      item => {
 
-      const isContribution =
-        item.movementType ===
-        "contribution";
+        const contribution =
+          item.movementType ===
+          "contribution";
 
 
-      return `
-        <div class="movement">
+        return `
+          <div class="movement">
 
-          <div>
+            <div>
+
+              <strong>
+                ${escapeHtml(
+                  item.concept
+                  || "Movimiento"
+                )}
+              </strong>
+
+              <small>
+                ${formatDate(
+                  item.movementDate
+                )}
+                ·
+                ${
+                  contribution
+                    ? "Aportación"
+                    : item.type === "common"
+                      ? "Gasto común"
+                      : "Gasto individual"
+                }
+              </small>
+
+            </div>
+
+            <span class="badge">
+              ${
+                contribution
+                  ? "Entrada"
+                  : "Salida"
+              }
+            </span>
 
             <strong>
-              ${escapeHtml(
-                item.concept
-                || "Movimiento"
+              ${
+                contribution
+                  ? "+"
+                  : "-"
+              }
+              ${formatMoney(
+                item.amount
               )}
             </strong>
 
-            <small>
-              ${formatDate(
-                item.movementDate
-              )}
-              ·
-              ${
-                isContribution
-                  ? "Aportación"
-                  : (
-                    item.type === "common"
-                      ? "Gasto común"
-                      : "Gasto individual"
-                  )
-              }
-            </small>
-
           </div>
-
-          <span class="badge">
-            ${
-              isContribution
-                ? "Entrada"
-                : "Salida"
-            }
-          </span>
-
-          <strong>
-            ${
-              isContribution
-                ? "+"
-                : "-"
-            }
-            ${formatMoney(item.amount)}
-          </strong>
-
-        </div>
-      `;
-
-    }).join("");
-
+        `;
+      }
+    ).join("");
 }
 
 
@@ -2135,6 +2240,7 @@ function renderMembers() {
   const container =
     $("membersList");
 
+
   if (!container) {
     return;
   }
@@ -2142,71 +2248,76 @@ function renderMembers() {
 
   if (!currentMembers.length) {
 
-    container.innerHTML =
-      "<p>No hay miembros.</p>";
+    container.innerHTML = `
+      <p class="empty">
+        No hay miembros registrados.
+      </p>
+    `;
 
     return;
-
   }
 
 
   container.innerHTML =
-    currentMembers.map(member => {
+    currentMembers.map(
+      member => {
 
-      const initial =
-        String(
-          member.name || "U"
-        )
-          .charAt(0)
-          .toUpperCase();
+        const initial =
+          String(
+            member.name
+            || "U"
+          )
+            .charAt(0)
+            .toUpperCase();
 
 
-      return `
-        <div class="member">
+        return `
+          <div class="member">
 
-          <div class="member-avatar">
+            <div class="member-avatar">
 
-            ${
-              member.photo
-                ? `
-                  <img
-                    src="${escapeAttribute(member.photo)}"
-                    alt="">
-                `
-                : initial
-            }
+              ${
+                member.photo
+                  ? `
+                    <img
+                      src="${escapeAttribute(member.photo)}"
+                      alt="">
+                  `
+                  : initial
+              }
+
+            </div>
+
+            <div class="member-info">
+
+              <strong>
+                ${escapeHtml(
+                  member.name
+                  || "Usuario"
+                )}
+              </strong>
+
+              <small>
+                ${escapeHtml(
+                  member.email
+                  || ""
+                )}
+              </small>
+
+            </div>
+
+            <span class="badge">
+              ${
+                member.role === "owner"
+                  ? "Administrador"
+                  : "Miembro"
+              }
+            </span>
 
           </div>
-
-          <div class="member-info">
-
-            <strong>
-              ${escapeHtml(
-                member.name || "Usuario"
-              )}
-            </strong>
-
-            <small>
-              ${escapeHtml(
-                member.email || ""
-              )}
-            </small>
-
-          </div>
-
-          <span class="badge">
-            ${
-              member.role === "owner"
-                ? "Administrador"
-                : "Miembro"
-            }
-          </span>
-
-        </div>
-      `;
-
-    }).join("");
-
+        `;
+      }
+    ).join("");
 }
 
 
@@ -2218,45 +2329,54 @@ function populateMemberSelectors() {
   ];
 
 
-  selectors.forEach(select => {
+  selectors.forEach(
+    select => {
 
-    if (!select) {
-      return;
+      if (!select) {
+        return;
+      }
+
+
+      const oldValue =
+        select.value;
+
+
+      select.innerHTML =
+        currentMembers
+          .map(
+            member => `
+              <option
+                value="${escapeAttribute(member.uid)}">
+                ${escapeHtml(
+                  member.name
+                  || "Usuario"
+                )}
+              </option>
+            `
+          )
+          .join("");
+
+
+      if (
+        currentMembers.some(
+          member =>
+            member.uid ===
+            oldValue
+        )
+      ) {
+
+        select.value =
+          oldValue;
+
+      } else if (
+        currentUser
+      ) {
+
+        select.value =
+          currentUser.uid;
+      }
     }
-
-
-    const currentValue =
-      select.value;
-
-
-    select.innerHTML =
-      currentMembers.map(
-        member => `
-          <option
-            value="${escapeAttribute(member.uid)}">
-            ${escapeHtml(
-              member.name || "Usuario"
-            )}
-          </option>
-        `
-      ).join("");
-
-
-    if (
-      currentMembers.some(
-        member =>
-          member.uid ===
-          currentValue
-      )
-    ) {
-
-      select.value =
-        currentValue;
-
-    }
-
-  });
-
+  );
 }
 
 
@@ -2266,7 +2386,6 @@ function getMember(uid) {
     member =>
       member.uid === uid
   );
-
 }
 
 
@@ -2278,24 +2397,23 @@ function navigate(page) {
 
   document
     .querySelectorAll(".page")
-    .forEach(section => {
-
-      section.classList.add(
-        "hidden"
-      );
-
-    });
+    .forEach(
+      section =>
+        section.classList.add(
+          "hidden"
+        )
+    );
 
 
   const target =
     $(`${page}Page`);
+
 
   if (target) {
 
     target.classList.remove(
       "hidden"
     );
-
   }
 
 
@@ -2303,14 +2421,16 @@ function navigate(page) {
     .querySelectorAll(
       ".menu-item[data-page]"
     )
-    .forEach(button => {
+    .forEach(
+      button => {
 
-      button.classList.toggle(
-        "active",
-        button.dataset.page === page
-      );
-
-    });
+        button.classList.toggle(
+          "active",
+          button.dataset.page ===
+          page
+        );
+      }
+    );
 
 
   const titles = {
@@ -2329,13 +2449,14 @@ function navigate(page) {
 
     settings:
       "Configuración"
-
   };
 
 
-  $("pageTitle").textContent =
+  setText(
+    "pageTitle",
     titles[page]
-    || "Dashboard";
+    || "Dashboard"
+  );
 
 
   $("sidebar")
@@ -2347,21 +2468,235 @@ function navigate(page) {
   if (page === "household") {
 
     loadHousehold();
-
   }
+}
 
-  if (page === "expenses") {
 
-    loadExpenses();
+/* =========================================================
+   EVENTOS
+========================================================= */
 
-  }
+function bindEvents() {
 
-  if (page === "contributions") {
+  $("googleLogin")
+    ?.addEventListener(
+      "click",
+      loginWithGoogle
+    );
 
-    loadContributions();
 
-  }
+  $("logout")
+    ?.addEventListener(
+      "click",
+      logout
+    );
 
+
+  $("settingsLogout")
+    ?.addEventListener(
+      "click",
+      logout
+    );
+
+
+  $("mobileMenu")
+    ?.addEventListener(
+      "click",
+      () =>
+        $("sidebar")
+          ?.classList.toggle(
+            "open"
+          )
+    );
+
+
+  document
+    .querySelectorAll(
+      ".menu-item[data-page]"
+    )
+    .forEach(
+      button =>
+        button.addEventListener(
+          "click",
+          () =>
+            navigate(
+              button.dataset.page
+            )
+        )
+    );
+
+
+  document
+    .querySelectorAll(
+      "[data-go]"
+    )
+    .forEach(
+      button =>
+        button.addEventListener(
+          "click",
+          () =>
+            navigate(
+              button.dataset.go
+            )
+        )
+    );
+
+
+  $("monthSelector")
+    ?.addEventListener(
+      "change",
+      event => {
+
+        selectedMonth =
+          event.target.value;
+
+        refreshDashboard();
+      }
+    );
+
+
+  $("previousMonth")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        selectedMonth =
+          shiftMonth(
+            selectedMonth,
+            -1
+          );
+
+
+        if ($("monthSelector")) {
+
+          $("monthSelector").value =
+            selectedMonth;
+        }
+
+
+        refreshDashboard();
+      }
+    );
+
+
+  $("nextMonth")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        selectedMonth =
+          shiftMonth(
+            selectedMonth,
+            1
+          );
+
+
+        if ($("monthSelector")) {
+
+          $("monthSelector").value =
+            selectedMonth;
+        }
+
+
+        refreshDashboard();
+      }
+    );
+
+
+  $("newExpense")
+    ?.addEventListener(
+      "click",
+      () =>
+        openExpenseModal()
+    );
+
+
+  $("expenseForm")
+    ?.addEventListener(
+      "submit",
+      saveExpense
+    );
+
+
+  $("expenseSearch")
+    ?.addEventListener(
+      "input",
+      renderExpenses
+    );
+
+
+  $("expenseFilter")
+    ?.addEventListener(
+      "change",
+      renderExpenses
+    );
+
+
+  $("newContribution")
+    ?.addEventListener(
+      "click",
+      openContributionModal
+    );
+
+
+  $("contributionForm")
+    ?.addEventListener(
+      "submit",
+      saveContribution
+    );
+
+
+  $("generateInvite")
+    ?.addEventListener(
+      "click",
+      generateInvite
+    );
+
+
+  $("joinHousehold")
+    ?.addEventListener(
+      "click",
+      joinHousehold
+    );
+
+
+  $("themeButton")
+    ?.addEventListener(
+      "click",
+      () =>
+        navigate(
+          "settings"
+        )
+    );
+
+
+  document
+    .querySelectorAll(
+      ".theme-option"
+    )
+    .forEach(
+      button =>
+        button.addEventListener(
+          "click",
+          () =>
+            setTheme(
+              button.dataset.theme
+            )
+        )
+    );
+
+
+  document
+    .querySelectorAll(
+      ".close-modal"
+    )
+    .forEach(
+      button =>
+        button.addEventListener(
+          "click",
+          closeModals
+        )
+    );
 }
 
 
@@ -2372,25 +2707,27 @@ function navigate(page) {
 function closeModals() {
 
   document
-    .querySelectorAll("dialog")
-    .forEach(dialog => {
+    .querySelectorAll(
+      "dialog"
+    )
+    .forEach(
+      dialog => {
 
-      if (dialog.open) {
-        dialog.close();
+        if (dialog.open) {
+          dialog.close();
+        }
       }
-
-    });
-
+    );
 }
 
 
 /* =========================================================
-   TEMA
+   TEMAS
 ========================================================= */
 
 function setTheme(theme) {
 
-  const allowed = [
+  const themes = [
     "classic",
     "modern",
     "clean",
@@ -2398,11 +2735,14 @@ function setTheme(theme) {
   ];
 
 
-  if (!allowed.includes(theme)) {
+  if (
+    !themes.includes(
+      theme
+    )
+  ) {
 
     theme =
       "classic";
-
   }
 
 
@@ -2418,16 +2758,88 @@ function setTheme(theme) {
 
 
   document
-    .querySelectorAll(".theme-option")
-    .forEach(button => {
+    .querySelectorAll(
+      ".theme-option"
+    )
+    .forEach(
+      button =>
+        button.classList.toggle(
+          "active",
+          button.dataset.theme ===
+          theme
+        )
+    );
+}
 
-      button.classList.toggle(
-        "active",
-        button.dataset.theme === theme
-      );
 
-    });
+/* =========================================================
+   INTERFAZ USUARIO
+========================================================= */
 
+function updateUserInterface() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  const name =
+    currentUser.displayName
+    || "Usuario";
+
+
+  const email =
+    currentUser.email
+    || "";
+
+
+  const photo =
+    currentUser.photoURL
+    || "";
+
+
+  setText(
+    "userName",
+    name
+  );
+
+
+  setText(
+    "userEmail",
+    email
+  );
+
+
+  setText(
+    "settingsName",
+    name
+  );
+
+
+  setText(
+    "settingsEmail",
+    email
+  );
+
+
+  if (
+    photo &&
+    $("userPhoto")
+  ) {
+
+    $("userPhoto").src =
+      photo;
+  }
+
+
+  if (
+    photo &&
+    $("settingsPhoto")
+  ) {
+
+    $("settingsPhoto").src =
+      photo;
+  }
 }
 
 
@@ -2442,16 +2854,17 @@ function showLoading() {
       "hidden"
     );
 
+
   $("loginScreen")
     ?.classList.add(
       "hidden"
     );
 
+
   $("app")
     ?.classList.add(
       "hidden"
     );
-
 }
 
 
@@ -2462,16 +2875,17 @@ function showLogin() {
       "hidden"
     );
 
+
   $("loginScreen")
     ?.classList.remove(
       "hidden"
     );
 
+
   $("app")
     ?.classList.add(
       "hidden"
     );
-
 }
 
 
@@ -2482,10 +2896,12 @@ function showApp() {
       "hidden"
     );
 
+
   $("loginScreen")
     ?.classList.add(
       "hidden"
     );
+
 
   $("app")
     ?.classList.remove(
@@ -2493,31 +2909,25 @@ function showApp() {
     );
 
 
-  $("userName").textContent =
-    currentUser.displayName
-    || "Usuario";
+  navigate(
+    "dashboard"
+  );
+}
 
 
-  $("userEmail").textContent =
-    currentUser.email
-    || "";
+/* =========================================================
+   DATOS
+========================================================= */
+
+async function refreshAll() {
+
+  await Promise.all([
+    loadExpenses(),
+    loadContributions()
+  ]);
 
 
-  $("settingsEmail").textContent =
-    currentUser.email
-    || "";
-
-
-  if (currentUser.photoURL) {
-
-    $("userPhoto").src =
-      currentUser.photoURL;
-
-  }
-
-
-  navigate("dashboard");
-
+  refreshDashboard();
 }
 
 
@@ -2527,33 +2937,45 @@ function showApp() {
 
 function getToday() {
 
-  const now =
+  const date =
     new Date();
 
+
   const year =
-    now.getFullYear();
+    date.getFullYear();
+
 
   const month =
     String(
-      now.getMonth() + 1
-    ).padStart(2, "0");
+      date.getMonth() + 1
+    )
+      .padStart(
+        2,
+        "0"
+      );
+
 
   const day =
     String(
-      now.getDate()
-    ).padStart(2, "0");
+      date.getDate()
+    )
+      .padStart(
+        2,
+        "0"
+      );
 
 
   return `${year}-${month}-${day}`;
-
 }
 
 
 function getCurrentMonth() {
 
   return getToday()
-    .substring(0, 7);
-
+    .substring(
+      0,
+      7
+    );
 }
 
 
@@ -2562,7 +2984,10 @@ function shiftMonth(
   amount
 ) {
 
-  const [year, m] =
+  const [
+    year,
+    monthNumber
+  ] =
     month
       .split("-")
       .map(Number);
@@ -2571,7 +2996,7 @@ function shiftMonth(
   const date =
     new Date(
       year,
-      m - 1 + amount,
+      monthNumber - 1 + amount,
       1
     );
 
@@ -2579,18 +3004,22 @@ function shiftMonth(
   return `${date.getFullYear()}-${String(
     date.getMonth() + 1
   ).padStart(2, "0")}`;
-
 }
 
 
-function formatMonth(value) {
+function formatMonth(
+  value
+) {
 
   if (!value) {
     return "";
   }
 
 
-  const [year, month] =
+  const [
+    year,
+    month
+  ] =
     value.split("-");
 
 
@@ -2605,15 +3034,19 @@ function formatMonth(value) {
   return date.toLocaleDateString(
     "es-ES",
     {
-      month: "long",
-      year: "numeric"
+      month:
+        "long",
+
+      year:
+        "numeric"
     }
   );
-
 }
 
 
-function formatDate(value) {
+function formatDate(
+  value
+) {
 
   if (!value) {
     return "—";
@@ -2629,34 +3062,65 @@ function formatDate(value) {
   return date.toLocaleDateString(
     "es-ES"
   );
-
 }
 
 
-function formatMoney(value) {
+function formatMoney(
+  value
+) {
 
   return new Intl.NumberFormat(
     "es-ES",
     {
-      style: "currency",
-      currency: "EUR"
-    }
-  ).format(
-    Number(value) || 0
-  );
 
+      style:
+        "currency",
+
+      currency:
+        "EUR"
+
+    }
+  )
+    .format(
+      Number(value)
+      || 0
+    );
 }
 
 
-function sum(items) {
+function sum(
+  items
+) {
 
   return items.reduce(
-    (total, item) =>
+    (
+      total,
+      item
+    ) =>
       total +
-      Number(item.amount || 0),
+      Number(
+        item.amount
+        || 0
+      ),
     0
   );
+}
 
+
+function setText(
+  id,
+  value
+) {
+
+  const element =
+    $(id);
+
+
+  if (element) {
+
+    element.textContent =
+      value;
+  }
 }
 
 
@@ -2668,6 +3132,7 @@ function setWidth(
   const element =
     $(id);
 
+
   if (!element) {
     return;
   }
@@ -2675,35 +3140,58 @@ function setWidth(
 
   element.style.width =
     `${Math.min(
-      Math.max(value, 0),
+      Math.max(
+        Number(value)
+        || 0,
+        0
+      ),
       100
     )}%`;
-
 }
 
 
-function escapeHtml(value) {
+function escapeHtml(
+  value
+) {
 
   return String(
     value ?? ""
   )
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-
+    .replaceAll(
+      "&",
+      "&amp;"
+    )
+    .replaceAll(
+      "<",
+      "&lt;"
+    )
+    .replaceAll(
+      ">",
+      "&gt;"
+    )
+    .replaceAll(
+      '"',
+      "&quot;"
+    )
+    .replaceAll(
+      "'",
+      "&#039;"
+    );
 }
 
 
-function escapeAttribute(value) {
+function escapeAttribute(
+  value
+) {
 
-  return escapeHtml(value);
-
+  return escapeHtml(
+    value
+  );
 }
 
 
 let toastTimer = null;
+
 
 function toast(
   message,
@@ -2712,6 +3200,7 @@ function toast(
 
   const element =
     $("toast");
+
 
   if (!element) {
     return;
@@ -2722,10 +3211,10 @@ function toast(
     message;
 
 
-  element.style.background =
+  element.classList.toggle(
+    "error",
     error
-      ? "#b91c1c"
-      : "#17202a";
+  );
 
 
   element.classList.add(
@@ -2744,9 +3233,56 @@ function toast(
         element.classList.remove(
           "show"
         ),
-      3000
+      3500
     );
+}
 
+
+function getFirebaseErrorMessage(
+  error
+) {
+
+  if (
+    error?.code ===
+    "permission-denied"
+  ) {
+
+    return "Firebase ha rechazado el acceso. Comprueba las reglas de Firestore.";
+  }
+
+
+  if (
+    error?.code ===
+    "auth/popup-blocked"
+  ) {
+
+    return "El navegador ha bloqueado la ventana de Google.";
+  }
+
+
+  if (
+    error?.code ===
+    "auth/unauthorized-domain"
+  ) {
+
+    return "Este dominio no está autorizado en Firebase Authentication.";
+  }
+
+
+  if (
+    error?.code ===
+    "auth/operation-not-allowed"
+  ) {
+
+    return "El acceso mediante Google no está habilitado en Firebase.";
+  }
+
+
+  return (
+    error?.message
+    ||
+    "Se ha producido un error."
+  );
 }
 
 
@@ -2763,7 +3299,9 @@ if (
     () => {
 
       navigator.serviceWorker
-        .register("./sw.js")
+        .register(
+          "./sw.js"
+        )
         .catch(
           error =>
             console.warn(
@@ -2771,8 +3309,6 @@ if (
               error
             )
         );
-
     }
   );
-
 }
