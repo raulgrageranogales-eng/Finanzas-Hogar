@@ -6,20 +6,19 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
 import {
   getFirestore,
+  collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
-  updateDoc,
   addDoc,
-  collection,
-  onSnapshot,
-  serverTimestamp
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 
@@ -28,150 +27,173 @@ import {
 ===================================================== */
 
 const firebaseConfig = {
-
-  apiKey:
-    "AIzaSyA1oKOXWYqauiGL4N8Oh3mG3JMP5ZFCxGw",
-
-  authDomain:
-    "finanzas-hogar-803fd.firebaseapp.com",
-
-  projectId:
-    "finanzas-hogar-803fd",
-
-  storageBucket:
-    "finanzas-hogar-803fd.firebasestorage.app",
-
-  messagingSenderId:
-    "461089916272",
-
-  appId:
-    "1:461089916272:web:c0755eddab52ea08673bb5"
-
+  apiKey: "AIzaSyA1oKOXWYqauiGL4N8Oh3mG3JMP5ZFCxGw",
+  authDomain: "finanzas-hogar-803fd.firebaseapp.com",
+  projectId: "finanzas-hogar-803fd",
+  storageBucket: "finanzas-hogar-803fd.firebasestorage.app",
+  messagingSenderId: "461089916272",
+  appId: "1:461089916272:web:c0755eddab52ea08673bb5"
 };
 
+const firebaseApp = initializeApp(firebaseConfig);
 
-const firebaseApp =
-  initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
 
+const db = getFirestore(firebaseApp);
 
-const auth =
-  getAuth(firebaseApp);
-
-
-const db =
-  getFirestore(firebaseApp);
-
-
-const googleProvider =
-  new GoogleAuthProvider();
+const provider = new GoogleAuthProvider();
 
 
 /* =====================================================
    ESTADO
 ===================================================== */
 
-let currentUser = null;
+let user = null;
 
-let currentHomeId = null;
+let homeId = null;
 
-let sharedMovementType = "expense";
+let home = null;
 
-let privateMovementType = "expense";
+let shared = [];
+
+let privateMovements = [];
+
+let goals = [];
+
+let recurring = [];
+
+let accounts = [];
+
+let members = [];
+
+let invitations = [];
+
+let sharedType = "expense";
+
+let privateType = "expense";
 
 let recurringType = "expense";
-
-let listeners = [];
 
 
 /* =====================================================
    UTILIDADES
 ===================================================== */
 
-function $(id) {
+const $ = id => document.getElementById(id);
 
-  return document.getElementById(id);
+const today = () =>
+  new Date().toISOString().slice(0,10);
 
-}
 
-
-function money(value) {
-
-  return new Intl.NumberFormat(
+const eur = number =>
+  new Intl.NumberFormat(
     "es-ES",
     {
-      style: "currency",
-      currency: "EUR"
+      style:"currency",
+      currency:"EUR"
     }
-  ).format(
-    Number(value) || 0
-  );
-
-}
+  ).format(Number(number) || 0);
 
 
-function today() {
-
-  return new Date()
-    .toISOString()
-    .split("T")[0];
-
-}
-
-
-function escapeHTML(value) {
-
-  const div =
-    document.createElement("div");
-
-  div.textContent =
-    String(value ?? "");
-
-  return div.innerHTML;
-
-}
+const esc = value =>
+  String(value ?? "")
+    .replace(/[&<>"']/g, char => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+    }[char]));
 
 
-function toast(message) {
+function toast(message){
 
-  const element =
-    $("toast");
+  const element = $("toast");
 
-  element.textContent =
-    message;
+  element.textContent = message;
 
-  element.classList.add(
-    "show"
-  );
+  element.classList.add("show");
 
   setTimeout(
-    () =>
-      element.classList.remove(
-        "show"
-      ),
+    () => element.classList.remove("show"),
     2500
   );
 
 }
 
 
-function clearListeners() {
+function monthName(index){
 
-  listeners.forEach(
-    unsubscribe => {
+  return [
+    "Ene",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dic"
+  ][index];
 
-      if (
-        typeof unsubscribe ===
-        "function"
-      ) {
+}
 
-        unsubscribe();
 
+function totals(list){
+
+  return list.reduce(
+    (result,item) => {
+
+      const amount = Number(item.amount) || 0;
+
+      if(item.type === "income"){
+        result.income += amount;
+      }else{
+        result.expenses += amount;
       }
 
+      return result;
+
+    },
+    {
+      income:0,
+      expenses:0
     }
   );
 
-  listeners = [];
+}
+
+
+/*
+  En movimientos comunes:
+  income = aportación al fondo común
+  expense = gasto común
+*/
+
+function sharedTotals(list){
+
+  return list.reduce(
+    (result,item) => {
+
+      const amount = Number(item.amount) || 0;
+
+      if(item.type === "income"){
+        result.contributions += amount;
+      }else{
+        result.expenses += amount;
+      }
+
+      return result;
+
+    },
+    {
+      contributions:0,
+      expenses:0
+    }
+  );
 
 }
 
@@ -180,1024 +202,671 @@ function clearListeners() {
    NAVEGACIÓN
 ===================================================== */
 
-function showSection(section) {
+function showSection(section){
 
-  const screens = [
+  document
+    .querySelectorAll("main")
+    .forEach(
+      main => main.classList.add("hidden")
+    );
 
-    "create-home-screen",
-    "home-screen",
-    "movements-screen",
-    "goals-screen",
-    "recurring-screen",
-    "members-screen",
-    "split-screen",
-    "private-screen"
+  const target = $(`${section}-screen`);
 
-  ];
+  if(target){
+    target.classList.remove("hidden");
+  }
+
+  window.scrollTo(0,0);
+
+}
 
 
-  screens.forEach(
-    screen => {
+/* =====================================================
+   CARGAR COLECCIONES
+===================================================== */
 
-      $(screen)
-        .classList
-        .add("hidden");
+async function getAll(path){
 
-    }
+  const snapshot =
+    await getDocs(
+      collection(db,...path)
+    );
+
+  return snapshot.docs.map(
+    item => ({
+      id:item.id,
+      ...item.data()
+    })
   );
 
+}
 
-  if (section === "home") {
+
+/* =====================================================
+   CARGAR DATOS
+===================================================== */
+
+async function loadData(){
+
+  if(!user){
+    return;
+  }
+
+
+  const userDocument =
+    await getDoc(
+      doc(db,"users",user.uid)
+    );
+
+
+  homeId =
+    userDocument.exists()
+      ? userDocument.data().homeId
+      : null;
+
+
+  if(!homeId){
+
+    $("create-home-screen")
+      .classList.remove("hidden");
 
     $("home-screen")
-      .classList
-      .remove("hidden");
+      .classList.add("hidden");
 
-  }
-
-  else if (section === "movements") {
-
-    $("movements-screen")
-      .classList
-      .remove("hidden");
-
-  }
-
-  else if (section === "goals") {
-
-    $("goals-screen")
-      .classList
-      .remove("hidden");
-
-  }
-
-  else if (section === "recurring") {
-
-    $("recurring-screen")
-      .classList
-      .remove("hidden");
-
-  }
-
-  else if (section === "members") {
-
-    $("members-screen")
-      .classList
-      .remove("hidden");
-
-  }
-
-  else if (section === "split") {
-
-    $("split-screen")
-      .classList
-      .remove("hidden");
-
-  }
-
-  else if (section === "private") {
-
-    $("private-screen")
-      .classList
-      .remove("hidden");
+    return;
 
   }
 
 
-  window.scrollTo(
-    0,
-    0
-  );
-
-}
-
-
-document.addEventListener(
-  "click",
-  event => {
-
-    const button =
-      event.target.closest(
-        "[data-section]"
-      );
-
-
-    if (!button) {
-      return;
-    }
-
-
-    showSection(
-      button.dataset.section
+  const homeDocument =
+    await getDoc(
+      doc(db,"homes",homeId)
     );
 
-  }
-);
+
+  home =
+    homeDocument.exists()
+      ? {
+          id:homeDocument.id,
+          ...homeDocument.data()
+        }
+      : null;
 
 
-/* =====================================================
-   LOGIN GOOGLE
-===================================================== */
-
-$("google-login").addEventListener(
-  "click",
-  async () => {
-
-    $("login-error")
-      .textContent = "";
-
-    try {
-
-      await signInWithPopup(
-        auth,
-        googleProvider
-      );
-
-    }
-
-    catch (error) {
-
-      console.error(error);
-
-      $("login-error")
-        .textContent =
-        "No se ha podido iniciar sesión con Google.";
-
-    }
-
-  }
-);
+  shared =
+    await getAll([
+      "homes",
+      homeId,
+      "movements"
+    ]);
 
 
-/* =====================================================
-   LOGOUT
-===================================================== */
-
-$("logout-button").addEventListener(
-  "click",
-  async () => {
-
-    await signOut(auth);
-
-  }
-);
+  goals =
+    await getAll([
+      "homes",
+      homeId,
+      "goals"
+    ]);
 
 
-/* =====================================================
-   AUTENTICACIÓN
-===================================================== */
-
-onAuthStateChanged(
-  auth,
-  async user => {
-
-    clearListeners();
-
-    currentUser =
-      user;
-
-    currentHomeId =
-      null;
+  recurring =
+    await getAll([
+      "homes",
+      homeId,
+      "recurring"
+    ]);
 
 
-    if (!user) {
-
-      $("login-screen")
-        .classList
-        .remove("hidden");
-
-      $("app-screen")
-        .classList
-        .add("hidden");
-
-      return;
-
-    }
+  members =
+    await getAll([
+      "homes",
+      homeId,
+      "members"
+    ]);
 
 
-    $("login-screen")
-      .classList
-      .add("hidden");
-
-    $("app-screen")
-      .classList
-      .remove("hidden");
-
-
-    $("user-name")
-      .textContent =
-      user.displayName ||
-      "Usuario";
+  invitations =
+    await getAll([
+      "homes",
+      homeId,
+      "invitations"
+    ]);
 
 
-    await loadUser();
-
-  }
-);
-
-
-/* =====================================================
-   USUARIO
-===================================================== */
-
-async function loadUser() {
-
-  const userRef =
-    doc(
-      db,
+  privateMovements =
+    await getAll([
       "users",
-      currentUser.uid
-    );
+      user.uid,
+      "privateMovements"
+    ]);
 
 
-  const snapshot =
-    await getDoc(
-      userRef
-    );
+  accounts =
+    await getAll([
+      "users",
+      user.uid,
+      "accounts"
+    ]);
 
-
-  if (!snapshot.exists()) {
-
-    await setDoc(
-      userRef,
-      {
-
-        uid:
-          currentUser.uid,
-
-        name:
-          currentUser.displayName ||
-          "Usuario",
-
-        email:
-          currentUser.email ||
-          "",
-
-        photoURL:
-          currentUser.photoURL ||
-          "",
-
-        homeId:
-          null,
-
-        createdAt:
-          serverTimestamp()
-
-      }
-    );
-
-
-    showCreateHome();
-
-    return;
-
-  }
-
-
-  currentHomeId =
-    snapshot.data().homeId ||
-    null;
-
-
-  if (!currentHomeId) {
-
-    showCreateHome();
-
-    return;
-
-  }
-
-
-  await loadHome();
-
-}
-
-
-/* =====================================================
-   CREAR HOGAR
-===================================================== */
-
-function showCreateHome() {
 
   $("create-home-screen")
-    .classList
-    .remove("hidden");
+    .classList.add("hidden");
+
+  $("home-screen")
+    .classList.remove("hidden");
+
+
+  renderAll();
 
 }
 
 
-$("create-home-button")
-  .addEventListener(
-    "click",
-    async () => {
+/* =====================================================
+   DASHBOARD
+===================================================== */
 
-      const name =
-        $("new-home-name")
-          .value
-          .trim();
+function renderDashboard(){
 
+  const now = new Date();
 
-      if (!name) {
+  const year = now.getFullYear();
 
-        toast(
-          "Introduce un nombre para el hogar."
-        );
-
-        return;
-
-      }
+  const month =
+    String(
+      now.getMonth()+1
+    ).padStart(2,"0");
 
 
-      try {
-
-        const homeReference =
-          await addDoc(
-            collection(
-              db,
-              "homes"
-            ),
-            {
-
-              name,
-
-              ownerId:
-                currentUser.uid,
-
-              createdAt:
-                serverTimestamp()
-
-            }
-          );
+  const currentPrefix =
+    `${year}-${month}`;
 
 
-        currentHomeId =
-          homeReference.id;
+  const commonMonth =
+    shared.filter(
+      item =>
+        String(item.date || "")
+          .startsWith(currentPrefix)
+    );
 
 
-        await setDoc(
-          doc(
-            db,
-            "homes",
-            currentHomeId,
-            "members",
-            currentUser.uid
-          ),
-          {
-
-            uid:
-              currentUser.uid,
-
-            name:
-              currentUser.displayName ||
-              "Usuario",
-
-            email:
-              currentUser.email ||
-              "",
-
-            role:
-              "owner",
-
-            joinedAt:
-              serverTimestamp()
-
-          }
-        );
+  const privateMonth =
+    privateMovements.filter(
+      item =>
+        String(item.date || "")
+          .startsWith(currentPrefix)
+    );
 
 
-        await updateDoc(
-          doc(
-            db,
-            "users",
-            currentUser.uid
-          ),
-          {
+  const common =
+    sharedTotals(commonMonth);
 
-            homeId:
-              currentHomeId
-
-          }
-        );
+  const individual =
+    totals(privateMonth);
 
 
-        await loadHome();
+  const commonSaving =
+    common.contributions -
+    common.expenses;
 
-        toast(
-          "Hogar creado correctamente."
-        );
 
-      }
+  const totalExpenses =
+    common.expenses +
+    individual.expenses;
 
-      catch (error) {
 
-        console.error(error);
+  const totalSaving =
+    commonSaving +
+    individual.income -
+    individual.expenses;
 
-        toast(
-          "No se ha podido crear el hogar."
-        );
 
-      }
+  const allCommon =
+    sharedTotals(shared);
 
-    }
-  );
+
+  $("home-title").textContent =
+    home?.name || "Finanzas Hogar";
+
+
+  $("dashboard-year").textContent =
+    year;
+
+
+  $("dashboard-contributions").textContent =
+    eur(common.contributions);
+
+
+  $("dashboard-common-expenses").textContent =
+    eur(common.expenses);
+
+
+  $("dashboard-individual-expenses").textContent =
+    eur(individual.expenses);
+
+
+  $("dashboard-common-saving").textContent =
+    eur(commonSaving);
+
+
+  $("home-income-month").textContent =
+    eur(common.contributions);
+
+
+  $("home-total-expenses").textContent =
+    eur(totalExpenses);
+
+
+  $("home-my-private-expenses").textContent =
+    eur(individual.expenses);
+
+
+  $("home-total-saving").textContent =
+    eur(totalSaving);
+
+
+  renderAnnual(year);
+
+}
 
 
 /* =====================================================
-   CARGAR HOGAR
+   ANUAL
 ===================================================== */
 
-async function loadHome() {
+function renderAnnual(year){
 
-  const homeReference =
-    doc(
-      db,
-      "homes",
-      currentHomeId
-    );
+  let cumulative = 0;
 
+  let annualSaving = 0;
 
-  const snapshot =
-    await getDoc(
-      homeReference
-    );
+  let rows = "";
+
+  let bars = "";
 
 
-  if (!snapshot.exists()) {
+  const annualData = [];
 
-    currentHomeId =
-      null;
 
-    showCreateHome();
+  for(let month=0;month<12;month++){
 
-    return;
+    const prefix =
+      `${year}-${String(month+1).padStart(2,"0")}`;
+
+
+    const common =
+      sharedTotals(
+        shared.filter(
+          item =>
+            String(item.date || "")
+              .startsWith(prefix)
+        )
+      );
+
+
+    const individual =
+      totals(
+        privateMovements.filter(
+          item =>
+            String(item.date || "")
+              .startsWith(prefix)
+        )
+      );
+
+
+    const saving =
+      common.contributions -
+      common.expenses;
+
+
+    cumulative += saving;
+
+    annualSaving += saving;
+
+
+    annualData.push({
+      month:monthName(month),
+      contributions:common.contributions,
+      commonExpenses:common.expenses,
+      individualExpenses:individual.expenses,
+      saving,
+      cumulative
+    });
 
   }
 
 
-  $("home-title")
+  const maximum =
+    Math.max(
+      1,
+      ...annualData.map(
+        item => Math.abs(item.saving)
+      )
+    );
+
+
+  annualData.forEach(item => {
+
+    rows += `
+      <tr>
+
+        <td>${item.month}</td>
+
+        <td>
+          ${eur(item.contributions)}
+        </td>
+
+        <td class="negative">
+          ${eur(item.commonExpenses)}
+        </td>
+
+        <td class="negative">
+          ${eur(item.individualExpenses)}
+        </td>
+
+        <td class="${item.saving >= 0 ? "positive" : "negative"}">
+          ${eur(item.saving)}
+        </td>
+
+        <td class="${item.cumulative >= 0 ? "positive" : "negative"}">
+          ${eur(item.cumulative)}
+        </td>
+
+      </tr>
+    `;
+
+
+    const height =
+      Math.max(
+        4,
+        Math.min(
+          100,
+          Math.abs(item.saving) /
+          maximum *
+          100
+        )
+      );
+
+
+    bars += `
+      <div class="bar-col">
+
+        <span class="bar-value">
+          ${eur(item.saving)}
+        </span>
+
+        <div
+          class="bar ${item.saving < 0 ? "negative" : ""}"
+          style="height:${height}%"
+        ></div>
+
+        <span class="bar-label">
+          ${item.month}
+        </span>
+
+      </div>
+    `;
+
+  });
+
+
+  $("annual-saving-total")
+    .textContent = eur(annualSaving);
+
+
+  $("annual-table-body")
+    .innerHTML = rows;
+
+
+  $("annual-bars")
+    .innerHTML = bars;
+
+}
+
+
+/* =====================================================
+   MOVIMIENTOS
+===================================================== */
+
+function movementHtml(item,privateMode=false){
+
+  const income =
+    item.type === "income";
+
+
+  const sign =
+    income ? "+" : "-";
+
+
+  const cls =
+    income ? "positive" : "negative";
+
+
+  return `
+    <div class="movement">
+
+      <div class="movement-info">
+
+        <strong>
+          ${esc(item.description || "Sin descripción")}
+        </strong>
+
+        <small>
+          ${esc(item.category || "otros")}
+          ·
+          ${esc(item.date || "")}
+
+          ${
+            item.ownerName
+              ? ` · ${esc(item.ownerName)}`
+              : ""
+          }
+
+        </small>
+
+      </div>
+
+
+      <strong class="${cls}">
+        ${sign}${eur(item.amount)}
+      </strong>
+
+
+      <button
+        class="delete-button"
+        data-delete="${privateMode ? "private" : "shared"}"
+        data-id="${item.id}"
+      >
+        🗑️
+      </button>
+
+    </div>
+  `;
+
+}
+
+
+function renderShared(){
+
+  $("shared-movements-list").innerHTML =
+
+    shared
+      .sort(
+        (a,b) =>
+          String(b.date)
+            .localeCompare(String(a.date))
+      )
+      .map(
+        item => movementHtml(item)
+      )
+      .join("")
+
+    ||
+
+    `<div class="card muted">
+      No hay movimientos comunes.
+    </div>`;
+
+}
+
+
+/* =====================================================
+   PRIVADO
+===================================================== */
+
+function renderPrivate(){
+
+  const total =
+    totals(privateMovements);
+
+
+  $("private-income")
     .textContent =
-    snapshot.data().name;
+    eur(total.income);
 
 
-  $("create-home-screen")
-    .classList
-    .add("hidden");
+  $("private-expenses")
+    .textContent =
+    eur(total.expenses);
 
 
-  subscribeSharedTransactions();
-
-  subscribeGoals();
-
-  subscribeRecurring();
-
-  subscribeMembers();
-
-  subscribeInvitations();
-
-  subscribePrivateData();
-
-  showSection(
-    "home"
-  );
-
-}
-
-
-/* =====================================================
-   MOVIMIENTOS COMPARTIDOS
-===================================================== */
-
-$("shared-date")
-  .value =
-  today();
-
-
-$("shared-expense-button")
-  .addEventListener(
-    "click",
-    () => {
-
-      sharedMovementType =
-        "expense";
-
-      $("shared-expense-button")
-        .classList
-        .add("active");
-
-      $("shared-income-button")
-        .classList
-        .remove("active");
-
-    }
-  );
-
-
-$("shared-income-button")
-  .addEventListener(
-    "click",
-    () => {
-
-      sharedMovementType =
-        "income";
-
-      $("shared-income-button")
-        .classList
-        .add("active");
-
-      $("shared-expense-button")
-        .classList
-        .remove("active");
-
-    }
-  );
-
-
-$("save-shared-button")
-  .addEventListener(
-    "click",
-    async () => {
-
-      const description =
-        $("shared-description")
-          .value
-          .trim();
-
-
-      const amount =
-        Number(
-          $("shared-amount")
-            .value
-        );
-
-
-      const date =
-        $("shared-date")
-          .value;
-
-
-      if (
-        !description ||
-        amount <= 0 ||
-        !date
-      ) {
-
-        toast(
-          "Completa descripción, importe y fecha."
-        );
-
-        return;
-
-      }
-
-
-      try {
-
-        await addDoc(
-          collection(
-            db,
-            "homes",
-            currentHomeId,
-            "sharedTransactions"
-          ),
-          {
-
-            homeId:
-              currentHomeId,
-
-            createdBy:
-              currentUser.uid,
-
-            createdByName:
-              currentUser.displayName ||
-              "Usuario",
-
-            type:
-              sharedMovementType,
-
-            description,
-
-            amount,
-
-            category:
-              $("shared-category")
-                .value,
-
-            date,
-
-            createdAt:
-              serverTimestamp()
-
-          }
-        );
-
-
-        $("shared-description")
-          .value = "";
-
-        $("shared-amount")
-          .value = "";
-
-
-        toast(
-          "Movimiento guardado."
-        );
-
-        showSection(
-          "movements"
-        );
-
-      }
-
-      catch (error) {
-
-        console.error(error);
-
-        toast(
-          "No se ha podido guardar."
-        );
-
-      }
-
-    }
-  );
-
-
-function subscribeSharedTransactions() {
-
-  const reference =
-    collection(
-      db,
-      "homes",
-      currentHomeId,
-      "sharedTransactions"
+  $("private-balance")
+    .textContent =
+    eur(
+      total.income -
+      total.expenses
     );
 
 
-  listeners.push(
+  $("private-movements-list").innerHTML =
 
-    onSnapshot(
-      reference,
-      snapshot => {
+    privateMovements
+      .sort(
+        (a,b) =>
+          String(b.date)
+            .localeCompare(String(a.date))
+      )
+      .map(
+        item =>
+          movementHtml(item,true)
+      )
+      .join("")
 
-        let income = 0;
+    ||
 
-        let expenses = 0;
-
-        const rows = [];
-
-
-        snapshot.forEach(
-          item => {
-
-            const data =
-              item.data();
-
-
-            rows.push({
-              id:
-                item.id,
-              ...data
-            });
+    `<div class="card muted">
+      No hay movimientos privados.
+    </div>`;
 
 
-            if (
-              data.type ===
-              "income"
-            ) {
+  $("private-accounts-list").innerHTML =
 
-              income +=
-                Number(
-                  data.amount
-                ) || 0;
+    accounts
+      .map(
+        item => `
 
-            }
+          <div class="account">
 
-            else {
+            <div>
 
-              expenses +=
-                Number(
-                  data.amount
-                ) || 0;
+              <strong>
+                ${esc(item.name)}
+              </strong>
 
-            }
+              <small>
+                ${eur(item.balance)}
+              </small>
 
-          }
-        );
+            </div>
 
 
-        rows.sort(
-          (a,b) =>
-            String(
-              b.date || ""
-            ).localeCompare(
-              String(
-                a.date || ""
-              )
-            )
-        );
+            <button
+              class="delete-button"
+              data-delete="account"
+              data-id="${item.id}"
+            >
+              🗑️
+            </button>
 
+          </div>
 
-        $("home-income")
-          .textContent =
-          money(income);
-
-
-        $("home-expenses")
-          .textContent =
-          money(expenses);
-
-
-        $("home-balance")
-          .textContent =
-          money(
-            income -
-            expenses
-          );
-
-
-        const list =
-          $("shared-movements-list");
-
-
-        if (!rows.length) {
-
-          list.innerHTML =
-            `<div class="empty">
-              No hay movimientos todavía.
-            </div>`;
-
-          return;
-
-        }
-
-
-        list.innerHTML =
-          rows.map(
-            row => `
-
-              <article class="card row">
-
-                <div>
-
-                  <strong>
-                    ${escapeHTML(
-                      row.description
-                    )}
-                  </strong>
-
-                  <small>
-                    ${escapeHTML(
-                      row.category ||
-                      "otros"
-                    )}
-                    ·
-                    ${escapeHTML(
-                      row.date ||
-                      ""
-                    )}
-                    ·
-                    ${escapeHTML(
-                      row.createdByName ||
-                      ""
-                    )}
-                  </small>
-
-                </div>
-
-                <strong
-                  class="${
-                    row.type === "income"
-                      ? "positive"
-                      : "negative"
-                  }"
-                >
-                  ${
-                    row.type === "income"
-                      ? "+"
-                      : "-"
-                  }${money(
-                    row.amount
-                  )}
-                </strong>
-
-              </article>
-
-            `
-          ).join("");
-
-      },
-
-      error => {
-
-        console.error(error);
-
-      }
-
-    )
-
-  );
+        `
+      )
+      .join("");
 
 }
 
 
 /* =====================================================
-   OBJETIVOS COMPARTIDOS
+   OBJETIVOS
 ===================================================== */
 
-$("save-goal-button")
-  .addEventListener(
-    "click",
-    async () => {
+function renderGoals(){
 
-      const name =
-        $("goal-name")
-          .value
-          .trim();
+  $("goals-list").innerHTML =
 
+    goals
+      .map(item => {
 
-      const target =
-        Number(
-          $("goal-target")
-            .value
-        );
+        const target =
+          Number(item.target) || 1;
 
+        const saved =
+          Number(item.saved) || 0;
 
-      if (
-        !name ||
-        target <= 0
-      ) {
-
-        toast(
-          "Completa nombre e importe."
-        );
-
-        return;
-
-      }
+        const percentage =
+          Math.min(
+            100,
+            saved / target * 100
+          );
 
 
-      try {
+        return `
 
-        await addDoc(
-          collection(
-            db,
-            "homes",
-            currentHomeId,
-            "sharedGoals"
-          ),
-          {
+          <div class="goal">
 
-            homeId:
-              currentHomeId,
+            <div style="flex:1">
 
-            name,
+              <strong>
+                ${esc(item.name)}
+              </strong>
 
-            target,
+              <small>
+                ${eur(saved)}
+                /
+                ${eur(target)}
+                ·
+                ${percentage.toFixed(0)}%
+              </small>
 
-            saved:
-              0,
+              <progress
+                max="100"
+                value="${percentage}"
+                style="width:100%"
+              ></progress>
 
-            createdBy:
-              currentUser.uid,
-
-            createdAt:
-              serverTimestamp()
-
-          }
-        );
+            </div>
 
 
-        $("goal-name")
-          .value = "";
+            <button
+              class="delete-button"
+              data-delete="goal"
+              data-id="${item.id}"
+            >
+              🗑️
+            </button>
 
-        $("goal-target")
-          .value = "";
+          </div>
 
+        `;
 
-        toast(
-          "Objetivo creado."
-        );
+      })
+      .join("")
 
-      }
+    ||
 
-      catch (error) {
-
-        console.error(error);
-
-        toast(
-          "No se ha podido crear."
-        );
-
-      }
-
-    }
-  );
-
-
-function subscribeGoals() {
-
-  listeners.push(
-
-    onSnapshot(
-      collection(
-        db,
-        "homes",
-        currentHomeId,
-        "sharedGoals"
-      ),
-      snapshot => {
-
-        const list =
-          $("goals-list");
-
-
-        if (snapshot.empty) {
-
-          list.innerHTML =
-            `<div class="empty">
-              No hay objetivos.
-            </div>`;
-
-          return;
-
-        }
-
-
-        list.innerHTML =
-          snapshot.docs
-            .map(
-              item => {
-
-                const data =
-                  item.data();
-
-
-                const target =
-                  Number(
-                    data.target
-                  ) || 0;
-
-
-                const saved =
-                  Number(
-                    data.saved
-                  ) || 0;
-
-
-                const percentage =
-                  target > 0
-                    ? Math.min(
-                        100,
-                        (
-                          saved /
-                          target
-                        ) * 100
-                      )
-                    : 0;
-
-
-                return `
-
-                  <article class="card">
-
-                    <strong>
-                      ${escapeHTML(
-                        data.name
-                      )}
-                    </strong>
-
-                    <small>
-                      ${money(saved)}
-                      de
-                      ${money(target)}
-                    </small>
-
-                    <div class="progress">
-
-                      <div
-                        style="
-                          width:${percentage}%
-                        "
-                      ></div>
-
-                    </div>
-
-                    <small>
-                      ${percentage.toFixed(0)}%
-                    </small>
-
-                  </article>
-
-                `;
-
-              }
-            )
-            .join("");
-
-      }
-    )
-
-  );
+    `<div class="card muted">
+      No hay objetivos.
+    </div>`;
 
 }
 
@@ -1206,237 +875,56 @@ function subscribeGoals() {
    RECURRENTES
 ===================================================== */
 
-$("recurring-expense-button")
-  .addEventListener(
-    "click",
-    () => {
+function renderRecurring(){
 
-      recurringType =
-        "expense";
+  $("recurring-list").innerHTML =
 
-      $("recurring-expense-button")
-        .classList
-        .add("active");
+    recurring
+      .map(
+        item => `
 
-      $("recurring-income-button")
-        .classList
-        .remove("active");
+          <div class="recurring">
 
-    }
-  );
+            <div>
 
+              <strong>
+                ${esc(item.name)}
+              </strong>
 
-$("recurring-income-button")
-  .addEventListener(
-    "click",
-    () => {
+              <small>
+                Día ${item.day}
+                ·
+                ${
+                  item.type === "income"
+                    ? "Ingreso"
+                    : "Gasto"
+                }
+                ·
+                ${eur(item.amount)}
+              </small>
 
-      recurringType =
-        "income";
+            </div>
 
-      $("recurring-income-button")
-        .classList
-        .add("active");
 
-      $("recurring-expense-button")
-        .classList
-        .remove("active");
+            <button
+              class="delete-button"
+              data-delete="recurring"
+              data-id="${item.id}"
+            >
+              🗑️
+            </button>
 
-    }
-  );
+          </div>
 
+        `
+      )
+      .join("")
 
-$("save-recurring-button")
-  .addEventListener(
-    "click",
-    async () => {
+    ||
 
-      const name =
-        $("recurring-name")
-          .value
-          .trim();
-
-
-      const amount =
-        Number(
-          $("recurring-amount")
-            .value
-        );
-
-
-      const day =
-        Number(
-          $("recurring-day")
-            .value
-        );
-
-
-      if (
-        !name ||
-        amount <= 0 ||
-        day < 1 ||
-        day > 31
-      ) {
-
-        toast(
-          "Revisa concepto, importe y día."
-        );
-
-        return;
-
-      }
-
-
-      try {
-
-        await addDoc(
-          collection(
-            db,
-            "homes",
-            currentHomeId,
-            "recurringTransactions"
-          ),
-          {
-
-            homeId:
-              currentHomeId,
-
-            name,
-
-            amount,
-
-            day,
-
-            type:
-              recurringType,
-
-            createdBy:
-              currentUser.uid,
-
-            createdAt:
-              serverTimestamp()
-
-          }
-        );
-
-
-        $("recurring-name")
-          .value = "";
-
-        $("recurring-amount")
-          .value = "";
-
-        $("recurring-day")
-          .value = "";
-
-
-        toast(
-          "Recurrente guardado."
-        );
-
-      }
-
-      catch (error) {
-
-        console.error(error);
-
-        toast(
-          "No se ha podido guardar."
-        );
-
-      }
-
-    }
-  );
-
-
-function subscribeRecurring() {
-
-  listeners.push(
-
-    onSnapshot(
-      collection(
-        db,
-        "homes",
-        currentHomeId,
-        "recurringTransactions"
-      ),
-      snapshot => {
-
-        const list =
-          $("recurring-list");
-
-
-        if (snapshot.empty) {
-
-          list.innerHTML =
-            `<div class="empty">
-              No hay movimientos recurrentes.
-            </div>`;
-
-          return;
-
-        }
-
-
-        list.innerHTML =
-          snapshot.docs
-            .map(
-              item => {
-
-                const data =
-                  item.data();
-
-
-                return `
-
-                  <article class="card row">
-
-                    <div>
-
-                      <strong>
-                        ${escapeHTML(
-                          data.name
-                        )}
-                      </strong>
-
-                      <small>
-                        Día
-                        ${escapeHTML(
-                          data.day
-                        )}
-                      </small>
-
-                    </div>
-
-                    <strong
-                      class="${
-                        data.type === "income"
-                          ? "positive"
-                          : "negative"
-                      }"
-                    >
-                      ${
-                        data.type === "income"
-                          ? "+"
-                          : "-"
-                      }${money(
-                        data.amount
-                      )}
-                    </strong>
-
-                  </article>
-
-                `;
-
-              }
-            )
-            .join("");
-
-      }
-    )
-
-  );
+    `<div class="card muted">
+      No hay movimientos recurrentes.
+    </div>`;
 
 }
 
@@ -1445,75 +933,661 @@ function subscribeRecurring() {
    MIEMBROS
 ===================================================== */
 
-function subscribeMembers() {
+function renderMembers(){
 
-  listeners.push(
+  $("members-list").innerHTML =
 
-    onSnapshot(
+    members
+      .map(
+        item => `
+
+          <div class="member">
+
+            <div>
+
+              <strong>
+                ${esc(
+                  item.name ||
+                  item.email ||
+                  "Usuario"
+                )}
+              </strong>
+
+              <small>
+                ${esc(item.email || "")}
+                ·
+                ${esc(item.role || "member")}
+              </small>
+
+            </div>
+
+          </div>
+
+        `
+      )
+      .join("");
+
+
+  $("pending-invitations").innerHTML =
+
+    invitations
+      .filter(
+        item =>
+          item.status === "pending"
+      )
+      .map(
+        item => `
+
+          <div class="invite">
+
+            <div>
+
+              <strong>
+                Invitación pendiente
+              </strong>
+
+              <small>
+                ${esc(item.email)}
+              </small>
+
+            </div>
+
+          </div>
+
+        `
+      )
+      .join("");
+
+}
+
+
+/* =====================================================
+   REPARTO
+===================================================== */
+
+function renderSplit(){
+
+  const year =
+    new Date().getFullYear();
+
+
+  const html =
+    members
+      .map(member => {
+
+        const memberShared =
+          shared.filter(
+            item =>
+              item.ownerUid === member.uid &&
+              String(item.date || "")
+                .startsWith(String(year))
+          );
+
+
+        const totalsMember =
+          sharedTotals(memberShared);
+
+
+        return `
+
+          <div class="member">
+
+            <div>
+
+              <strong>
+                ${esc(
+                  member.name ||
+                  member.email ||
+                  "Usuario"
+                )}
+              </strong>
+
+              <small>
+                Aportaciones:
+                ${eur(totalsMember.contributions)}
+                ·
+                Gastos:
+                ${eur(totalsMember.expenses)}
+              </small>
+
+            </div>
+
+
+            <strong class="saving">
+              ${eur(
+                totalsMember.contributions -
+                totalsMember.expenses
+              )}
+            </strong>
+
+          </div>
+
+        `;
+
+      })
+      .join("");
+
+
+  $("split-list").innerHTML =
+    html ||
+    `<div class="card muted">
+      Aún no hay datos.
+    </div>`;
+
+}
+
+
+/* =====================================================
+   CREAR HOGAR
+===================================================== */
+
+async function createHome(){
+
+  const name =
+    $("new-home-name")
+      .value
+      .trim()
+      ||
+      "Mi hogar";
+
+
+  const homeDocument =
+    doc(
       collection(
         db,
-        "homes",
-        currentHomeId,
-        "members"
-      ),
-      snapshot => {
-
-        const list =
-          $("members-list");
+        "homes"
+      )
+    );
 
 
-        list.innerHTML =
-          snapshot.docs
-            .map(
-              item => {
-
-                const data =
-                  item.data();
+  homeId =
+    homeDocument.id;
 
 
-                return `
-
-                  <article class="card row">
-
-                    <div>
-
-                      <strong>
-                        ${escapeHTML(
-                          data.name ||
-                          "Usuario"
-                        )}
-                      </strong>
-
-                      <small>
-                        ${escapeHTML(
-                          data.email ||
-                          ""
-                        )}
-                      </small>
-
-                    </div>
-
-                    <span>
-                      ${
-                        data.role ===
-                        "owner"
-                          ? "Administrador"
-                          : "Miembro"
-                      }
-                    </span>
-
-                  </article>
-
-                `;
-
-              }
-            )
-            .join("");
-
-      }
-    )
-
+  await setDoc(
+    homeDocument,
+    {
+      name,
+      ownerUid:user.uid,
+      createdAt:
+        new Date().toISOString()
+    }
   );
+
+
+  await setDoc(
+    doc(
+      db,
+      "homes",
+      homeId,
+      "members",
+      user.uid
+    ),
+    {
+      uid:user.uid,
+      email:user.email,
+      name:
+        user.displayName ||
+        user.email,
+      role:"owner"
+    }
+  );
+
+
+  await setDoc(
+    doc(
+      db,
+      "users",
+      user.uid
+    ),
+    {
+      homeId
+    },
+    {
+      merge:true
+    }
+  );
+
+
+  toast("Hogar creado");
+
+  await loadData();
+
+}
+
+
+/* =====================================================
+   GUARDAR COMÚN
+===================================================== */
+
+async function saveShared(){
+
+  const description =
+    $("shared-description")
+      .value
+      .trim();
+
+
+  const amount =
+    Number(
+      $("shared-amount").value
+    );
+
+
+  const date =
+    $("shared-date").value;
+
+
+  if(
+    !description ||
+    amount <= 0 ||
+    !date
+  ){
+
+    toast(
+      "Completa descripción, importe y fecha"
+    );
+
+    return;
+  }
+
+
+  await addDoc(
+    collection(
+      db,
+      "homes",
+      homeId,
+      "movements"
+    ),
+    {
+
+      description,
+
+      amount,
+
+      type:sharedType,
+
+      category:
+        $("shared-category").value,
+
+      date,
+
+      ownerUid:user.uid,
+
+      ownerName:
+        user.displayName ||
+        user.email,
+
+      createdAt:
+        new Date().toISOString()
+
+    }
+  );
+
+
+  $("shared-description").value = "";
+
+  $("shared-amount").value = "";
+
+
+  toast("Movimiento guardado");
+
+  await loadData();
+
+}
+
+
+/* =====================================================
+   GUARDAR PRIVADO
+===================================================== */
+
+async function savePrivate(){
+
+  const description =
+    $("private-description")
+      .value
+      .trim();
+
+
+  const amount =
+    Number(
+      $("private-amount").value
+    );
+
+
+  const date =
+    $("private-date").value;
+
+
+  if(
+    !description ||
+    amount <= 0 ||
+    !date
+  ){
+
+    toast(
+      "Completa descripción, importe y fecha"
+    );
+
+    return;
+  }
+
+
+  await addDoc(
+    collection(
+      db,
+      "users",
+      user.uid,
+      "privateMovements"
+    ),
+    {
+
+      description,
+
+      amount,
+
+      type:privateType,
+
+      category:
+        $("private-category").value,
+
+      date,
+
+      ownerUid:user.uid,
+
+      ownerName:
+        user.displayName ||
+        user.email,
+
+      createdAt:
+        new Date().toISOString()
+
+    }
+  );
+
+
+  $("private-description").value = "";
+
+  $("private-amount").value = "";
+
+
+  toast(
+    "Movimiento privado guardado"
+  );
+
+
+  await loadData();
+
+}
+
+
+/* =====================================================
+   BORRAR
+===================================================== */
+
+async function deleteItem(
+  type,
+  id
+){
+
+  const paths = {
+
+    shared:[
+      "homes",
+      homeId,
+      "movements",
+      id
+    ],
+
+    private:[
+      "users",
+      user.uid,
+      "privateMovements",
+      id
+    ],
+
+    account:[
+      "users",
+      user.uid,
+      "accounts",
+      id
+    ],
+
+    goal:[
+      "homes",
+      homeId,
+      "goals",
+      id
+    ],
+
+    recurring:[
+      "homes",
+      homeId,
+      "recurring",
+      id
+    ]
+
+  };
+
+
+  if(
+    !confirm(
+      "¿Eliminar este registro?\n\n" +
+      "Esta acción no se puede deshacer."
+    )
+  ){
+
+    return;
+
+  }
+
+
+  await deleteDoc(
+    doc(
+      db,
+      ...paths[type]
+    )
+  );
+
+
+  toast("Registro eliminado");
+
+  await loadData();
+
+}
+
+
+/* =====================================================
+   OBJETIVOS
+===================================================== */
+
+async function saveGoal(){
+
+  const name =
+    $("goal-name")
+      .value
+      .trim();
+
+
+  const target =
+    Number(
+      $("goal-target").value
+    );
+
+
+  const saved =
+    Number(
+      $("goal-saved").value
+    ) || 0;
+
+
+  if(
+    !name ||
+    target <= 0
+  ){
+
+    toast(
+      "Completa el objetivo"
+    );
+
+    return;
+  }
+
+
+  await addDoc(
+    collection(
+      db,
+      "homes",
+      homeId,
+      "goals"
+    ),
+    {
+      name,
+      target,
+      saved,
+      createdAt:
+        new Date().toISOString()
+    }
+  );
+
+
+  $("goal-name").value = "";
+
+  $("goal-target").value = "";
+
+  $("goal-saved").value = "";
+
+
+  toast(
+    "Objetivo creado"
+  );
+
+
+  await loadData();
+
+}
+
+
+/* =====================================================
+   RECURRENTES
+===================================================== */
+
+async function saveRecurring(){
+
+  const name =
+    $("recurring-name")
+      .value
+      .trim();
+
+
+  const amount =
+    Number(
+      $("recurring-amount").value
+    );
+
+
+  const day =
+    Number(
+      $("recurring-day").value
+    );
+
+
+  if(
+    !name ||
+    amount <= 0 ||
+    day < 1 ||
+    day > 31
+  ){
+
+    toast(
+      "Completa correctamente los datos"
+    );
+
+    return;
+  }
+
+
+  await addDoc(
+    collection(
+      db,
+      "homes",
+      homeId,
+      "recurring"
+    ),
+    {
+      name,
+      amount,
+      day,
+      type:recurringType,
+      createdAt:
+        new Date().toISOString()
+    }
+  );
+
+
+  toast(
+    "Recurrente guardado"
+  );
+
+
+  await loadData();
+
+}
+
+
+/* =====================================================
+   CUENTAS
+===================================================== */
+
+async function saveAccount(){
+
+  const name =
+    $("private-account-name")
+      .value
+      .trim();
+
+
+  const balance =
+    Number(
+      $("private-account-balance").value
+    ) || 0;
+
+
+  if(!name){
+
+    toast(
+      "Introduce un nombre"
+    );
+
+    return;
+  }
+
+
+  await addDoc(
+    collection(
+      db,
+      "users",
+      user.uid,
+      "accounts"
+    ),
+    {
+      name,
+      balance
+    }
+  );
+
+
+  $("private-account-name").value = "";
+
+  $("private-account-balance").value = "";
+
+
+  toast(
+    "Cuenta añadida"
+  );
+
+
+  await loadData();
 
 }
 
@@ -1522,1033 +1596,491 @@ function subscribeMembers() {
    INVITACIONES
 ===================================================== */
 
-$("invite-button")
-  .addEventListener(
-    "click",
-    async () => {
+async function invite(){
 
-      const email =
-        $("invite-email")
-          .value
-          .trim()
-          .toLowerCase();
+  const email =
+    $("invite-email")
+      .value
+      .trim()
+      .toLowerCase();
 
 
-      if (
-        !email ||
-        !email.includes("@")
-      ) {
+  if(!email){
 
-        toast(
-          "Introduce un correo válido."
-        );
+    toast(
+      "Introduce un correo"
+    );
 
-        return;
-
-      }
+    return;
+  }
 
 
-      try {
-
-        await addDoc(
-          collection(
-            db,
-            "invitations"
-          ),
-          {
-
-            email,
-
-            homeId:
-              currentHomeId,
-
-            createdBy:
-              currentUser.uid,
-
-            status:
-              "pending",
-
-            createdAt:
-              serverTimestamp()
-
-          }
-        );
-
-
-        $("invite-email")
-          .value = "";
-
-
-        $("invite-message")
-          .textContent =
-          "Invitación creada correctamente.";
-
-
-        toast(
-          "Invitación creada."
-        );
-
-      }
-
-      catch (error) {
-
-        console.error(error);
-
-        toast(
-          "No se ha podido crear la invitación."
-        );
-
-      }
-
+  await addDoc(
+    collection(
+      db,
+      "homes",
+      homeId,
+      "invitations"
+    ),
+    {
+      email,
+      status:"pending",
+      createdBy:user.uid,
+      createdAt:
+        new Date().toISOString()
     }
   );
 
 
-function subscribeInvitations() {
+  $("invite-email").value = "";
 
-  listeners.push(
-
-    onSnapshot(
-      collection(
-        db,
-        "invitations"
-      ),
-      snapshot => {
-
-        const documents =
-          snapshot.docs.map(
-            item => ({
-              id:
-                item.id,
-              ...item.data()
-            })
-          );
+  $("invite-message").textContent =
+    "Invitación creada. La persona debe entrar con ese correo.";
 
 
-        const sent =
-          documents.filter(
-            item =>
-              item.createdBy ===
-              currentUser.uid
-              &&
-              item.homeId ===
-              currentHomeId
-              &&
-              item.status ===
-              "pending"
-          );
-
-
-        $("pending-invitations")
-          .innerHTML =
-          sent.length
-            ? `
-
-              <h2>
-                Invitaciones pendientes
-              </h2>
-
-              ${
-                sent.map(
-                  item => `
-
-                    <article class="card">
-
-                      <strong>
-                        Invitación pendiente
-                      </strong>
-
-                      <small>
-                        ${escapeHTML(
-                          item.email
-                        )}
-                      </small>
-
-                    </article>
-
-                  `
-                ).join("")
-              }
-
-            `
-            : "";
-
-
-        const received =
-          documents.filter(
-            item =>
-              item.email ===
-              (
-                currentUser.email ||
-                ""
-              ).toLowerCase()
-              &&
-              item.status ===
-              "pending"
-          );
-
-
-        $("received-invitations")
-          .innerHTML =
-          received.length
-            ? `
-
-              <h2>
-                Invitaciones recibidas
-              </h2>
-
-              ${
-                received.map(
-                  item => `
-
-                    <article class="card">
-
-                      <strong>
-                        Invitación a un hogar
-                      </strong>
-
-                      <small>
-                        ${escapeHTML(
-                          item.email
-                        )}
-                      </small>
-
-                      <button
-                        class="primary-button accept-invitation"
-                        data-id="${item.id}"
-                        data-home="${item.homeId}"
-                      >
-                        Aceptar invitación
-                      </button>
-
-                    </article>
-
-                  `
-                ).join("")
-              }
-
-            `
-            : "";
-
-      }
-    )
-
+  toast(
+    "Invitación creada"
   );
+
+
+  await loadData();
 
 }
 
 
-document.addEventListener(
+/* =====================================================
+   SELECTOR DE TIPO
+===================================================== */
+
+function setType(
+  group,
+  type
+){
+
+  if(group === "shared"){
+    sharedType = type;
+  }
+
+  if(group === "private"){
+    privateType = type;
+  }
+
+  if(group === "recurring"){
+    recurringType = type;
+  }
+
+
+  const ids =
+    group === "shared"
+      ? [
+          "shared-expense-button",
+          "shared-income-button"
+        ]
+
+      : group === "private"
+      ? [
+          "private-expense-button",
+          "private-income-button"
+        ]
+
+      : [
+          "recurring-expense-button",
+          "recurring-income-button"
+        ];
+
+
+  $(ids[0])
+    .classList
+    .toggle(
+      "active",
+      type === "expense"
+    );
+
+
+  $(ids[1])
+    .classList
+    .toggle(
+      "active",
+      type === "income"
+    );
+
+}
+
+
+/* =====================================================
+   APARIENCIA
+===================================================== */
+
+function applyAppearance(){
+
+  const style =
+    localStorage.getItem(
+      "fh-style"
+    )
+    ||
+    "classic";
+
+
+  const theme =
+    localStorage.getItem(
+      "fh-theme"
+    )
+    ||
+    "system";
+
+
+  const density =
+    localStorage.getItem(
+      "fh-density"
+    )
+    ||
+    "comfortable";
+
+
+  document.body.classList.remove(
+    "style-classic",
+    "style-modern",
+    "style-minimal",
+    "density-compact"
+  );
+
+
+  document.body.classList.add(
+    `style-${style}`
+  );
+
+
+  if(
+    density === "compact"
+  ){
+
+    document.body.classList.add(
+      "density-compact"
+    );
+
+  }
+
+
+  document.documentElement
+    .setAttribute(
+      "data-theme",
+      theme
+    );
+
+}
+
+
+/* =====================================================
+   EVENTOS
+===================================================== */
+
+$("google-login").onclick =
+  async () => {
+
+    try{
+
+      await signInWithPopup(
+        auth,
+        provider
+      );
+
+    }catch(error){
+
+      $("login-error")
+        .textContent =
+        error.message;
+
+    }
+
+  };
+
+
+$("logout-button").onclick =
+  () =>
+    signOut(auth);
+
+
+$("create-home-button").onclick =
+  createHome;
+
+
+$("save-shared-button").onclick =
+  saveShared;
+
+
+$("save-private-movement").onclick =
+  savePrivate;
+
+
+$("save-goal-button").onclick =
+  saveGoal;
+
+
+$("save-recurring-button").onclick =
+  saveRecurring;
+
+
+$("save-private-account").onclick =
+  saveAccount;
+
+
+$("invite-button").onclick =
+  invite;
+
+
+/* TIPOS */
+
+$("shared-expense-button").onclick =
+  () =>
+    setType(
+      "shared",
+      "expense"
+    );
+
+
+$("shared-income-button").onclick =
+  () =>
+    setType(
+      "shared",
+      "income"
+    );
+
+
+$("private-expense-button").onclick =
+  () =>
+    setType(
+      "private",
+      "expense"
+    );
+
+
+$("private-income-button").onclick =
+  () =>
+    setType(
+      "private",
+      "income"
+    );
+
+
+$("recurring-expense-button").onclick =
+  () =>
+    setType(
+      "recurring",
+      "expense"
+    );
+
+
+$("recurring-income-button").onclick =
+  () =>
+    setType(
+      "recurring",
+      "income"
+    );
+
+
+/* NAVEGACIÓN */
+
+document
+  .querySelectorAll(
+    "[data-section]"
+  )
+  .forEach(
+    button => {
+
+      button.onclick =
+        () =>
+          showSection(
+            button.dataset.section
+          );
+
+    }
+  );
+
+
+/* BORRADO */
+
+document.body.addEventListener(
   "click",
-  async event => {
+  event => {
 
     const button =
       event.target.closest(
-        ".accept-invitation"
+        "[data-delete]"
       );
 
 
-    if (!button) {
+    if(!button){
       return;
     }
 
 
-    try {
-
-      await setDoc(
-        doc(
-          db,
-          "homes",
-          button.dataset.home,
-          "members",
-          currentUser.uid
-        ),
-        {
-
-          uid:
-            currentUser.uid,
-
-          name:
-            currentUser.displayName ||
-            "Usuario",
-
-          email:
-            currentUser.email ||
-            "",
-
-          role:
-            "member",
-
-          joinedAt:
-            serverTimestamp()
-
-        }
-      );
-
-
-      await updateDoc(
-        doc(
-          db,
-          "users",
-          currentUser.uid
-        ),
-        {
-
-          homeId:
-            button.dataset.home
-
-        }
-      );
-
-
-      await updateDoc(
-        doc(
-          db,
-          "invitations",
-          button.dataset.id
-        ),
-        {
-
-          status:
-            "accepted",
-
-          acceptedBy:
-            currentUser.uid,
-
-          acceptedAt:
-            serverTimestamp()
-
-        }
-      );
-
-
-      currentHomeId =
-        button.dataset.home;
-
-
-      await loadHome();
-
-
-      toast(
-        "Invitación aceptada."
-      );
-
-    }
-
-    catch (error) {
-
-      console.error(error);
-
-      toast(
-        "No se ha podido aceptar la invitación."
-      );
-
-    }
+    deleteItem(
+      button.dataset.delete,
+      button.dataset.id
+    );
 
   }
 );
 
 
-/* =====================================================
-   REPARTO
-===================================================== */
+/* APARIENCIA */
 
-function updateSplit() {
+document
+  .querySelectorAll(
+    "[data-theme]"
+  )
+  .forEach(
+    button => {
 
-  const list =
-    $("split-list");
+      button.onclick = () => {
+
+        localStorage.setItem(
+          "fh-theme",
+          button.dataset.theme
+        );
+
+        applyAppearance();
+
+      };
+
+    }
+  );
 
 
-  list.innerHTML =
-    `<div class="empty">
-      El reparto se calculará con los movimientos
-      registrados por cada miembro.
-    </div>`;
+document
+  .querySelectorAll(
+    "[data-style]"
+  )
+  .forEach(
+    button => {
 
-}
+      button.onclick = () => {
+
+        localStorage.setItem(
+          "fh-style",
+          button.dataset.style
+        );
+
+        applyAppearance();
+
+      };
+
+    }
+  );
 
 
-setInterval(
-  updateSplit,
-  1000
-);
+document
+  .querySelectorAll(
+    "[data-density]"
+  )
+  .forEach(
+    button => {
+
+      button.onclick = () => {
+
+        localStorage.setItem(
+          "fh-density",
+          button.dataset.density
+        );
+
+        applyAppearance();
+
+      };
+
+    }
+  );
 
 
-/* =====================================================
-   DATOS PRIVADOS
-===================================================== */
+/* FECHAS */
 
-$("private-date")
-  .value =
+$("shared-date").value =
+  today();
+
+$("private-date").value =
   today();
 
 
-$("private-expense-button")
-  .addEventListener(
-    "click",
-    () => {
-
-      privateMovementType =
-        "expense";
-
-      $("private-expense-button")
-        .classList
-        .add("active");
-
-      $("private-income-button")
-        .classList
-        .remove("active");
-
-    }
-  );
-
-
-$("private-income-button")
-  .addEventListener(
-    "click",
-    () => {
-
-      privateMovementType =
-        "income";
-
-      $("private-income-button")
-        .classList
-        .add("active");
-
-      $("private-expense-button")
-        .classList
-        .remove("active");
-
-    }
-  );
-
-
-/* CUENTA PRIVADA */
-
-$("save-private-account")
-  .addEventListener(
-    "click",
-    async () => {
-
-      const name =
-        $("private-account-name")
-          .value
-          .trim();
-
-
-      const balance =
-        Number(
-          $("private-account-balance")
-            .value
-        ) || 0;
-
-
-      if (!name) {
-
-        toast(
-          "Escribe el nombre de la cuenta."
-        );
-
-        return;
-
-      }
-
-
-      try {
-
-        await addDoc(
-          collection(
-            db,
-            "users",
-            currentUser.uid,
-            "privateAccounts"
-          ),
-          {
-
-            userId:
-              currentUser.uid,
-
-            name,
-
-            balance,
-
-            createdAt:
-              serverTimestamp()
-
-          }
-        );
-
-
-        $("private-account-name")
-          .value = "";
-
-        $("private-account-balance")
-          .value = "";
-
-
-        toast(
-          "Cuenta añadida."
-        );
-
-      }
-
-      catch (error) {
-
-        console.error(error);
-
-        toast(
-          "No se ha podido guardar."
-        );
-
-      }
-
-    }
-  );
-
-
-/* MOVIMIENTO PRIVADO */
-
-$("save-private-movement")
-  .addEventListener(
-    "click",
-    async () => {
-
-      const description =
-        $("private-description")
-          .value
-          .trim();
-
-
-      const amount =
-        Number(
-          $("private-amount")
-            .value
-        );
-
-
-      const date =
-        $("private-date")
-          .value;
-
-
-      if (
-        !description ||
-        amount <= 0 ||
-        !date
-      ) {
-
-        toast(
-          "Completa descripción, importe y fecha."
-        );
-
-        return;
-
-      }
-
-
-      try {
-
-        await addDoc(
-          collection(
-            db,
-            "users",
-            currentUser.uid,
-            "privateTransactions"
-          ),
-          {
-
-            userId:
-              currentUser.uid,
-
-            type:
-              privateMovementType,
-
-            description,
-
-            amount,
-
-            category:
-              $("private-category")
-                .value,
-
-            date,
-
-            createdAt:
-              serverTimestamp()
-
-          }
-        );
-
-
-        $("private-description")
-          .value = "";
-
-        $("private-amount")
-          .value = "";
-
-
-        toast(
-          "Movimiento privado guardado."
-        );
-
-      }
-
-      catch (error) {
-
-        console.error(error);
-
-        toast(
-          "No se ha podido guardar."
-        );
-
-      }
-
-    }
-  );
-
-
-/* OBJETIVO PRIVADO */
-
-$("save-private-goal")
-  .addEventListener(
-    "click",
-    async () => {
-
-      const name =
-        $("private-goal-name")
-          .value
-          .trim();
-
-
-      const target =
-        Number(
-          $("private-goal-target")
-            .value
-        );
-
-
-      const saved =
-        Number(
-          $("private-goal-saved")
-            .value
-        ) || 0;
-
-
-      if (
-        !name ||
-        target <= 0 ||
-        saved < 0
-      ) {
-
-        toast(
-          "Completa correctamente los datos."
-        );
-
-        return;
-
-      }
-
-
-      try {
-
-        await addDoc(
-          collection(
-            db,
-            "users",
-            currentUser.uid,
-            "privateGoals"
-          ),
-          {
-
-            userId:
-              currentUser.uid,
-
-            name,
-
-            target,
-
-            saved,
-
-            createdAt:
-              serverTimestamp()
-
-          }
-        );
-
-
-        $("private-goal-name")
-          .value = "";
-
-        $("private-goal-target")
-          .value = "";
-
-        $("private-goal-saved")
-          .value = "";
-
-
-        toast(
-          "Objetivo privado creado."
-        );
-
-      }
-
-      catch (error) {
-
-        console.error(error);
-
-        toast(
-          "No se ha podido crear."
-        );
-
-      }
-
-    }
-  );
-
-
-/* =====================================================
-   ESCUCHAR DATOS PRIVADOS
-===================================================== */
-
-function subscribePrivateData() {
-
-
-  /* MOVIMIENTOS */
-
-  listeners.push(
-
-    onSnapshot(
-      collection(
-        db,
-        "users",
-        currentUser.uid,
-        "privateTransactions"
-      ),
-      snapshot => {
-
-        let income = 0;
-
-        let expenses = 0;
-
-        const rows = [];
-
-
-        snapshot.forEach(
-          item => {
-
-            const data =
-              item.data();
-
-
-            rows.push(data);
-
-
-            if (
-              data.type ===
-              "income"
-            ) {
-
-              income +=
-                Number(
-                  data.amount
-                ) || 0;
-
-            }
-
-            else {
-
-              expenses +=
-                Number(
-                  data.amount
-                ) || 0;
-
-            }
-
-          }
-        );
-
-
-        $("private-income")
-          .textContent =
-          money(income);
-
-
-        $("private-expenses")
-          .textContent =
-          money(expenses);
-
-
-        $("private-balance")
-          .textContent =
-          money(
-            income -
-            expenses
-          );
-
-
-        rows.sort(
-          (a,b) =>
-            String(
-              b.date || ""
-            ).localeCompare(
-              String(
-                a.date || ""
-              )
-            )
-        );
-
-
-        $("private-movements-list")
-          .innerHTML =
-          rows.length
-
-            ? rows.map(
-                row => `
-
-                  <article class="card row">
-
-                    <div>
-
-                      <strong>
-                        ${escapeHTML(
-                          row.description
-                        )}
-                      </strong>
-
-                      <small>
-                        ${escapeHTML(
-                          row.category ||
-                          "otros"
-                        )}
-                        ·
-                        ${escapeHTML(
-                          row.date ||
-                          ""
-                        )}
-                      </small>
-
-                    </div>
-
-                    <strong
-                      class="${
-                        row.type === "income"
-                          ? "positive"
-                          : "negative"
-                      }"
-                    >
-                      ${
-                        row.type === "income"
-                          ? "+"
-                          : "-"
-                      }${money(
-                        row.amount
-                      )}
-                    </strong>
-
-                  </article>
-
-                `
-              ).join("")
-
-            : "";
-
-      }
+/* PWA */
+
+if(
+  "serviceWorker"
+  in navigator
+){
+
+  navigator.serviceWorker
+    .register(
+      "./service-worker.js"
     )
-
-  );
-
-
-  /* CUENTAS */
-
-  listeners.push(
-
-    onSnapshot(
-      collection(
-        db,
-        "users",
-        currentUser.uid,
-        "privateAccounts"
-      ),
-      snapshot => {
-
-        $("private-accounts-list")
-          .innerHTML =
-
-          snapshot.empty
-
-            ? `
-              <div class="empty">
-                No tienes cuentas privadas.
-              </div>
-            `
-
-            : snapshot.docs.map(
-                item => {
-
-                  const data =
-                    item.data();
-
-
-                  return `
-
-                    <article class="card">
-
-                      <strong>
-                        ${escapeHTML(
-                          data.name
-                        )}
-                      </strong>
-
-                      <small>
-                        Saldo
-                      </small>
-
-                      <strong>
-                        ${money(
-                          data.balance
-                        )}
-                      </strong>
-
-                    </article>
-
-                  `;
-
-                }
-              ).join("");
-
-      }
-    )
-
-  );
-
-
-  /* OBJETIVOS */
-
-  listeners.push(
-
-    onSnapshot(
-      collection(
-        db,
-        "users",
-        currentUser.uid,
-        "privateGoals"
-      ),
-      snapshot => {
-
-        $("private-goals-list")
-          .innerHTML =
-
-          snapshot.empty
-
-            ? `
-              <div class="empty">
-                No tienes objetivos privados.
-              </div>
-            `
-
-            : snapshot.docs.map(
-                item => {
-
-                  const data =
-                    item.data();
-
-
-                  const target =
-                    Number(
-                      data.target
-                    ) || 0;
-
-
-                  const saved =
-                    Number(
-                      data.saved
-                    ) || 0;
-
-
-                  const percentage =
-                    target > 0
-
-                      ? Math.min(
-                          100,
-                          (
-                            saved /
-                            target
-                          ) * 100
-                        )
-
-                      : 0;
-
-
-                  return `
-
-                    <article class="card">
-
-                      <strong>
-                        ${escapeHTML(
-                          data.name
-                        )}
-                      </strong>
-
-                      <small>
-                        ${money(saved)}
-                        de
-                        ${money(target)}
-                      </small>
-
-                      <div class="progress">
-
-                        <div
-                          style="
-                            width:${percentage}%
-                          "
-                        ></div>
-
-                      </div>
-
-                      <small>
-                        ${percentage.toFixed(0)}%
-                      </small>
-
-                    </article>
-
-                  `;
-
-                }
-              ).join("");
-
-      }
-    )
-
-  );
+    .catch(
+      () => {}
+    );
 
 }
 
 
 /* =====================================================
-   SERVICE WORKER
+   AUTENTICACIÓN
 ===================================================== */
 
-if (
-  "serviceWorker" in navigator
-) {
+onAuthStateChanged(
+  auth,
+  async currentUser => {
 
-  window.addEventListener(
-    "load",
-    () => {
+    user =
+      currentUser;
 
-      navigator.serviceWorker
-        .register(
-          "./service-worker.js"
-        )
-        .catch(
-          error =>
-            console.error(
-              "Service Worker:",
-              error
-            )
-        );
+
+    if(user){
+
+      $("login-screen")
+        .classList
+        .add("hidden");
+
+
+      $("app-screen")
+        .classList
+        .remove("hidden");
+
+
+      $("user-name")
+        .textContent =
+        user.displayName ||
+        user.email ||
+        "Usuario";
+
+
+      await setDoc(
+        doc(
+          db,
+          "users",
+          user.uid
+        ),
+        {
+          email:user.email,
+          name:
+            user.displayName ||
+            user.email
+        },
+        {
+          merge:true
+        }
+      );
+
+
+      await loadData();
+
+    }else{
+
+      $("login-screen")
+        .classList
+        .remove("hidden");
+
+
+      $("app-screen")
+        .classList
+        .add("hidden");
 
     }
-  );
 
-}
+  }
+);
