@@ -1,864 +1,840 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <meta
-        name="theme-color"
-        content="#2563eb"
-    >
-
-    <meta
-        name="description"
-        content="Gestión financiera del hogar"
-    >
-
-    <link
-        rel="manifest"
-        href="manifest.json"
-    >
-
-    <link
-        rel="stylesheet"
-        href="styles.css"
-    >
-
-    <title>Finanzas Hogar</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#17324d">
+  <meta name="description" content="Gestión de finanzas del hogar">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <title>Finanzas Hogar</title>
 </head>
 
 <body>
 
-<!-- ==========================================
-     LOGIN
-========================================== -->
+<div id="toast" class="toast"></div>
 
-<section
-    id="login-screen"
-    class="screen"
->
+<!-- LOGIN -->
 
-    <div class="login-card">
+<section id="login-screen" class="login-screen">
 
-        <div class="logo">
-            💰
-        </div>
+  <div class="login-box">
 
-        <h1>
-            Finanzas Hogar
-        </h1>
+    <div class="logo">€</div>
 
-        <p>
-            Tu economía.<br>
-            Compartida y privada.
-        </p>
+    <h1>Finanzas Hogar</h1>
 
-        <button
-            id="google-login"
-            class="google-button"
-        >
-            <span>G</span>
-            Continuar con Google
-        </button>
+    <p>
+      Gestiona las finanzas compartidas y privadas
+      de forma sencilla y segura.
+    </p>
 
-        <p
-            id="login-error"
-            class="error"
-        ></p>
+    <button id="google-login" class="primary-button">
+      <span class="google-icon">G</span>
+      Continuar con Google
+    </button>
 
-    </div>
+    <p id="login-error" class="error"></p>
+
+  </div>
 
 </section>
 
 
-<!-- ==========================================
-     APLICACIÓN
-========================================== -->
+<!-- APLICACIÓN -->
 
-<section
-    id="app-screen"
-    class="screen hidden"
->
+<section id="app-screen" class="hidden">
 
-
-<!-- CABECERA -->
-
-<header class="app-header">
+  <header class="topbar">
 
     <div>
-
-        <small>
-            Finanzas Hogar
-        </small>
-
-        <h2 id="user-name">
-            Usuario
-        </h2>
-
+      <small>Finanzas Hogar</small>
+      <strong id="user-name">Usuario</strong>
     </div>
 
-    <button
-        id="logout-button"
-        class="logout-button"
-    >
-        Salir
+    <button id="logout-button" class="logout-button">
+      Salir
     </button>
 
-</header>
+  </header>
 
 
-<!-- ==========================================
-     CREAR HOGAR
-========================================== -->
+  <!-- CREAR HOGAR -->
 
-<main
-    id="no-home"
-    class="content hidden"
->
+  <main id="create-home-screen" class="page hidden">
 
-    <div class="card">
+    <div class="card center">
 
-        <div class="section-icon">
-            🏠
-        </div>
+      <div class="large-icon">🏠</div>
 
-        <h2>
-            Crea tu hogar
-        </h2>
+      <h1>Crea tu hogar</h1>
 
-        <p>
-            Aquí gestionarás las finanzas
-            compartidas con las personas
-            que invites.
-        </p>
+      <p>
+        Crea el espacio compartido donde gestionaréis
+        las finanzas del hogar.
+      </p>
 
-        <input
-            id="home-name"
-            type="text"
-            placeholder="Ej. Casa García"
-            maxlength="50"
-        >
+      <input
+        id="new-home-name"
+        type="text"
+        maxlength="60"
+        placeholder="Ej. Casa"
+      >
 
-        <button
-            id="create-home"
-            class="primary-button"
-        >
-            Crear hogar
-        </button>
+      <button id="create-home-button" class="primary-button">
+        Crear hogar
+      </button>
 
     </div>
 
-</main>
+  </main>
 
 
-<!-- ==========================================
-     DASHBOARD
-========================================== -->
+  <!-- INICIO -->
 
-<main
-    id="home-content"
-    class="content hidden"
->
+  <main id="home-screen" class="page hidden">
 
-    <div class="home-title">
+    <div class="heading">
 
-        <small>
-            Mi hogar
-        </small>
+      <small>Mi hogar</small>
 
-        <h1 id="home-name-display">
-            Mi hogar
-        </h1>
+      <h1 id="home-title">
+        Finanzas Hogar
+      </h1>
 
     </div>
 
 
-    <!-- RESUMEN -->
+    <div class="summary-grid">
 
-    <div class="dashboard-grid">
+      <div class="card">
+        <small>Balance</small>
+        <strong id="home-balance">
+          0,00 €
+        </strong>
+      </div>
 
-        <div class="card balance-card">
+      <div class="card">
+        <small>Ingresos</small>
+        <strong id="home-income" class="positive">
+          0,00 €
+        </strong>
+      </div>
 
-            <small>
-                Balance
-            </small>
-
-            <strong id="monthly-balance">
-                0,00 €
-            </strong>
-
-            <span class="card-subtitle">
-                Este mes
-            </span>
-
-        </div>
-
-
-        <div class="card">
-
-            <small>
-                Ingresos
-            </small>
-
-            <strong
-                id="shared-income"
-                class="positive"
-            >
-                0,00 €
-            </strong>
-
-        </div>
-
-
-        <div class="card">
-
-            <small>
-                Gastos
-            </small>
-
-            <strong
-                id="shared-expenses"
-                class="negative"
-            >
-                0,00 €
-            </strong>
-
-        </div>
+      <div class="card">
+        <small>Gastos</small>
+        <strong id="home-expenses" class="negative">
+          0,00 €
+        </strong>
+      </div>
 
     </div>
 
 
-    <!-- ACCIONES RÁPIDAS -->
+    <h2>Acceso rápido</h2>
 
-    <h3 class="section-title">
-        Acciones rápidas
-    </h3>
+    <div class="quick-grid">
 
-    <div class="quick-actions">
+      <button class="quick-button" data-section="movements">
+        <span>💳</span>
+        Movimientos
+      </button>
 
-        <button
-            class="quick-button"
-            data-section="movements"
-        >
-            <span>➕</span>
-            <small>
-                Movimiento
-            </small>
-        </button>
+      <button class="quick-button" data-section="goals">
+        <span>🎯</span>
+        Objetivos
+      </button>
 
+      <button class="quick-button" data-section="members">
+        <span>👥</span>
+        Miembros
+      </button>
 
-        <button
-            class="quick-button"
-            data-section="reparto"
-        >
-            <span>⚖️</span>
-            <small>
-                Reparto
-            </small>
-        </button>
-
-
-        <button
-            class="quick-button"
-            data-section="goal"
-        >
-            <span>🎯</span>
-            <small>
-                Objetivo
-            </small>
-        </button>
-
-
-        <button
-            class="quick-button"
-            data-section="members"
-        >
-            <span>👥</span>
-            <small>
-                Miembros
-            </small>
-        </button>
+      <button class="quick-button" data-section="private">
+        <span>🔒</span>
+        Mi cuenta
+      </button>
 
     </div>
 
 
-    <!-- MENÚ -->
-
-    <h3 class="section-title">
-        Finanzas
-    </h3>
+    <h2>Gestión del hogar</h2>
 
     <div class="menu-grid">
 
-        <button
-            class="menu-button"
-            data-section="movements"
-        >
-            💳
-            <span>
-                Movimientos
-            </span>
-        </button>
+      <button class="menu-button" data-section="movements">
+        💳
+        <span>Movimientos</span>
+      </button>
 
+      <button class="menu-button" data-section="recurring">
+        📅
+        <span>Recurrentes</span>
+      </button>
 
-        <button
-            class="menu-button"
-            data-section="recurrentes"
-        >
-            📅
-            <span>
-                Recurrentes
-            </span>
-        </button>
+      <button class="menu-button" data-section="goals">
+        🎯
+        <span>Objetivos</span>
+      </button>
 
+      <button class="menu-button" data-section="split">
+        ⚖️
+        <span>Reparto</span>
+      </button>
 
-        <button
-            class="menu-button"
-            data-section="reparto"
-        >
-            ⚖️
-            <span>
-                Reparto
-            </span>
-        </button>
+      <button class="menu-button" data-section="members">
+        👥
+        <span>Miembros</span>
+      </button>
 
-
-        <button
-            class="menu-button"
-            data-section="objetivos"
-        >
-            🎯
-            <span>
-                Objetivos
-            </span>
-        </button>
-
-
-        <button
-            class="menu-button"
-            data-section="members"
-        >
-            👥
-            <span>
-                Miembros
-            </span>
-        </button>
-
-
-        <button
-            id="private-button"
-            class="menu-button private"
-            data-section="private"
-        >
-            🔒
-            <span>
-                Mi cuenta
-            </span>
-        </button>
+      <button class="menu-button private-button" data-section="private">
+        🔒
+        <span>Mi cuenta</span>
+      </button>
 
     </div>
 
-</main>
+  </main>
 
 
-<!-- ==========================================
-     MOVIMIENTOS
-========================================== -->
+  <!-- MOVIMIENTOS -->
 
-<main
-    id="movements-content"
-    class="content app-section hidden"
->
+  <main id="movements-screen" class="page section-screen hidden">
 
-    <button
-        class="back-button"
-        data-section="home"
-    >
-        ← Volver
+    <button class="back-button" data-section="home">
+      ← Volver
     </button>
 
-    <h1>
-        💳 Movimientos
-    </h1>
+    <h1>💳 Movimientos</h1>
 
-    <p class="section-description">
-        Ingresos y gastos compartidos del hogar.
+    <p class="muted">
+      Ingresos y gastos compartidos del hogar.
     </p>
 
 
-    <div class="card">
+    <div class="card form-card">
 
-        <h3>
-            Nuevo movimiento
-        </h3>
+      <div class="type-selector">
 
-        <div class="movement-type">
-
-            <button
-                id="expense-type"
-                class="type-button active"
-            >
-                💸 Gasto
-            </button>
-
-            <button
-                id="income-type"
-                class="type-button"
-            >
-                💰 Ingreso
-            </button>
-
-        </div>
-
-
-        <input
-            id="movement-description"
-            type="text"
-            placeholder="Descripción"
+        <button
+          id="shared-expense-button"
+          class="type-button active"
         >
+          💸 Gasto
+        </button>
 
-
-        <input
-            id="movement-amount"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="Importe (€)"
+        <button
+          id="shared-income-button"
+          class="type-button"
         >
+          💰 Ingreso
+        </button>
+
+      </div>
 
 
-        <select id="movement-category">
+      <label>
+        Descripción
+        <input
+          id="shared-description"
+          type="text"
+          placeholder="Ej. Compra supermercado"
+        >
+      </label>
 
-            <option value="">
-                Categoría
-            </option>
 
-            <option value="vivienda">
-                🏠 Vivienda
-            </option>
+      <label>
+        Importe
+        <input
+          id="shared-amount"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0,00"
+        >
+      </label>
 
-            <option value="alimentacion">
-                🛒 Alimentación
-            </option>
 
-            <option value="transporte">
-                🚗 Transporte
-            </option>
+      <label>
+        Categoría
 
-            <option value="ocio">
-                🎮 Ocio
-            </option>
+        <select id="shared-category">
 
-            <option value="salud">
-                ❤️ Salud
-            </option>
+          <option value="vivienda">
+            🏠 Vivienda
+          </option>
 
-            <option value="suministros">
-                💡 Suministros
-            </option>
+          <option value="alimentacion">
+            🛒 Alimentación
+          </option>
 
-            <option value="otros">
-                📦 Otros
-            </option>
+          <option value="transporte">
+            🚗 Transporte
+          </option>
+
+          <option value="suministros">
+            💡 Suministros
+          </option>
+
+          <option value="ocio">
+            🎮 Ocio
+          </option>
+
+          <option value="salud">
+            ❤️ Salud
+          </option>
+
+          <option value="otros">
+            📦 Otros
+          </option>
 
         </select>
 
+      </label>
 
+
+      <label>
+        Fecha
         <input
-            id="movement-date"
-            type="date"
+          id="shared-date"
+          type="date"
         >
+      </label>
 
 
-        <button
-            id="save-movement"
-            class="primary-button"
-        >
-            Guardar movimiento
-        </button>
+      <button
+        id="save-shared-button"
+        class="primary-button"
+      >
+        Guardar movimiento
+      </button>
 
     </div>
 
 
-    <div>
+    <div id="shared-movements-list"></div>
 
-        <h3 class="section-title">
-            Últimos movimientos
-        </h3>
-
-        <div id="movements-list">
-
-            <div class="empty-state">
-                No hay movimientos todavía.
-            </div>
-
-        </div>
-
-    </div>
-
-</main>
+  </main>
 
 
-<!-- ==========================================
-     REPARTO
-========================================== -->
+  <!-- OBJETIVOS -->
 
-<main
-    id="reparto-content"
-    class="content app-section hidden"
->
+  <main id="goals-screen" class="page section-screen hidden">
 
-    <button
-        class="back-button"
-        data-section="home"
-    >
-        ← Volver
+    <button class="back-button" data-section="home">
+      ← Volver
     </button>
 
-    <h1>
-        ⚖️ Reparto
-    </h1>
+    <h1>🎯 Objetivos</h1>
 
-    <p class="section-description">
-        Consulta cómo se distribuyen los
-        gastos del hogar.
-    </p>
-
-    <div class="card">
-
-        <h3>
-            Reparto del mes
-        </h3>
-
-        <div id="reparto-list">
-
-            <div class="empty-state">
-                Todavía no hay datos suficientes.
-            </div>
-
-        </div>
-
-    </div>
-
-</main>
-
-
-<!-- ==========================================
-     OBJETIVOS
-========================================== -->
-
-<main
-    id="objetivos-content"
-    class="content app-section hidden"
->
-
-    <button
-        class="back-button"
-        data-section="home"
-    >
-        ← Volver
-    </button>
-
-    <h1>
-        🎯 Objetivos
-    </h1>
-
-    <div class="card">
-
-        <h3>
-            Nuevo objetivo
-        </h3>
-
-        <input
-            id="goal-name"
-            type="text"
-            placeholder="Ej. Vacaciones"
-        >
-
-        <input
-            id="goal-target"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Objetivo (€)"
-        >
-
-        <button
-            id="save-goal"
-            class="primary-button"
-        >
-            Crear objetivo
-        </button>
-
-    </div>
-
-
-    <div id="goals-list">
-
-        <div class="empty-state">
-            No hay objetivos todavía.
-        </div>
-
-    </div>
-
-</main>
-
-
-<!-- ==========================================
-     RECURRENTES
-========================================== -->
-
-<main
-    id="recurrentes-content"
-    class="content app-section hidden"
->
-
-    <button
-        class="back-button"
-        data-section="home"
-    >
-        ← Volver
-    </button>
-
-    <h1>
-        📅 Recurrentes
-    </h1>
-
-    <p class="section-description">
-        Gastos e ingresos periódicos.
-    </p>
-
-    <div class="card">
-
-        <p>
-            Aquí podremos gestionar alquiler,
-            hipoteca, nóminas, seguros,
-            suscripciones y otros movimientos
-            periódicos.
-        </p>
-
-        <div class="empty-state">
-            No hay movimientos recurrentes.
-        </div>
-
-    </div>
-
-</main>
-
-
-<!-- ==========================================
-     MIEMBROS
-========================================== -->
-
-<main
-    id="members-content"
-    class="content app-section hidden"
->
-
-    <button
-        class="back-button"
-        data-section="home"
-    >
-        ← Volver
-    </button>
-
-    <h1>
-        👥 Miembros
-    </h1>
-
-    <div
-        id="members-list"
-        class="members-list"
-    >
-        Cargando...
-    </div>
-
-
-    <div class="card">
-
-        <h3>
-            Invitar a una persona
-        </h3>
-
-        <input
-            id="invite-email"
-            type="email"
-            placeholder="correo@gmail.com"
-        >
-
-        <button
-            id="send-invitation"
-            class="primary-button"
-        >
-            Crear invitación
-        </button>
-
-        <p
-            id="invite-result"
-            class="success-message"
-        ></p>
-
-    </div>
-
-</main>
-
-
-<!-- ==========================================
-     CUENTA PRIVADA
-========================================== -->
-
-<main
-    id="private-content"
-    class="content app-section hidden"
->
-
-    <button
-        class="back-button"
-        data-section="home"
-    >
-        ← Volver
-    </button>
-
-    <h1>
-        🔒 Mi cuenta
-    </h1>
-
-    <p class="section-description">
-        Esta información pertenece únicamente
-        a tu cuenta.
+    <p class="muted">
+      Objetivos de ahorro compartidos.
     </p>
 
 
-    <div class="dashboard-grid">
+    <div class="card form-card">
 
-        <div class="card">
+      <label>
+        Nombre del objetivo
 
-            <small>
-                Mis ingresos
-            </small>
+        <input
+          id="goal-name"
+          type="text"
+          placeholder="Ej. Vacaciones"
+        >
 
-            <strong
-                id="private-income"
-                class="positive"
-            >
-                0,00 €
-            </strong>
-
-        </div>
+      </label>
 
 
-        <div class="card">
+      <label>
+        Importe objetivo
 
-            <small>
-                Mis gastos
-            </small>
+        <input
+          id="goal-target"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0,00"
+        >
 
-            <strong
-                id="private-expenses"
-                class="negative"
-            >
-                0,00 €
-            </strong>
-
-        </div>
+      </label>
 
 
-        <div class="card balance-card">
-
-            <small>
-                Mi balance
-            </small>
-
-            <strong id="private-savings">
-                0,00 €
-            </strong>
-
-        </div>
+      <button
+        id="save-goal-button"
+        class="primary-button"
+      >
+        Crear objetivo
+      </button>
 
     </div>
 
 
-    <div class="card">
+    <div id="goals-list"></div>
 
-        <h3>
-            🔐 Zona privada
-        </h3>
+  </main>
 
-        <p>
-            Los datos que introduzcas aquí
-            estarán vinculados exclusivamente
-            a tu cuenta de Google.
-        </p>
+
+  <!-- RECURRENTES -->
+
+  <main id="recurring-screen" class="page section-screen hidden">
+
+    <button class="back-button" data-section="home">
+      ← Volver
+    </button>
+
+    <h1>📅 Recurrentes</h1>
+
+    <p class="muted">
+      Gastos e ingresos que se repiten cada mes.
+    </p>
+
+
+    <div class="card form-card">
+
+      <div class="type-selector">
+
+        <button
+          id="recurring-expense-button"
+          class="type-button active"
+        >
+          💸 Gasto
+        </button>
+
+        <button
+          id="recurring-income-button"
+          class="type-button"
+        >
+          💰 Ingreso
+        </button>
+
+      </div>
+
+
+      <label>
+        Concepto
+
+        <input
+          id="recurring-name"
+          type="text"
+          placeholder="Ej. Alquiler"
+        >
+
+      </label>
+
+
+      <label>
+        Importe
+
+        <input
+          id="recurring-amount"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0,00"
+        >
+
+      </label>
+
+
+      <label>
+        Día del mes
+
+        <input
+          id="recurring-day"
+          type="number"
+          min="1"
+          max="31"
+          placeholder="1"
+        >
+
+      </label>
+
+
+      <button
+        id="save-recurring-button"
+        class="primary-button"
+      >
+        Guardar recurrente
+      </button>
 
     </div>
 
-</main>
+
+    <div id="recurring-list"></div>
+
+  </main>
 
 
-<!-- ==========================================
-     NAVEGACIÓN INFERIOR
-========================================== -->
+  <!-- MIEMBROS -->
 
-<nav
-    id="bottom-nav"
-    class="bottom-nav hidden"
->
+  <main id="members-screen" class="page section-screen hidden">
 
-    <button
-        data-section="home"
-    >
-        🏠
-        <span>
-            Inicio
-        </span>
+    <button class="back-button" data-section="home">
+      ← Volver
     </button>
 
+    <h1>👥 Miembros</h1>
 
-    <button
-        data-section="movements"
-    >
-        💳
-        <span>
-            Movimientos
-        </span>
+    <p class="muted">
+      Personas que pertenecen al hogar.
+    </p>
+
+
+    <div id="members-list"></div>
+
+
+    <div class="card form-card">
+
+      <h2>Invitar a otra persona</h2>
+
+      <p class="muted">
+        Introduce su correo de Google.
+      </p>
+
+
+      <input
+        id="invite-email"
+        type="email"
+        placeholder="correo@gmail.com"
+        autocomplete="email"
+      >
+
+
+      <button
+        id="invite-button"
+        class="primary-button"
+      >
+        Crear invitación
+      </button>
+
+
+      <p id="invite-message" class="success"></p>
+
+    </div>
+
+
+    <div id="pending-invitations"></div>
+
+    <div id="received-invitations"></div>
+
+  </main>
+
+
+  <!-- REPARTO -->
+
+  <main id="split-screen" class="page section-screen hidden">
+
+    <button class="back-button" data-section="home">
+      ← Volver
     </button>
 
+    <h1>⚖️ Reparto</h1>
 
-    <button
-        data-section="objetivos"
-    >
-        🎯
-        <span>
-            Objetivos
-        </span>
+    <p class="muted">
+      Resumen de los movimientos registrados por cada miembro.
+    </p>
+
+
+    <div id="split-list"></div>
+
+  </main>
+
+
+  <!-- CUENTA PRIVADA -->
+
+  <main id="private-screen" class="page section-screen hidden">
+
+    <button class="back-button" data-section="home">
+      ← Volver
     </button>
 
+    <h1>🔒 Mi cuenta</h1>
 
-    <button
-        data-section="private"
-    >
-        🔒
-        <span>
-            Mi cuenta
-        </span>
+    <p class="muted">
+      Esta información pertenece exclusivamente a tu cuenta.
+    </p>
+
+
+    <div class="summary-grid">
+
+      <div class="card">
+        <small>Mis ingresos</small>
+        <strong id="private-income" class="positive">
+          0,00 €
+        </strong>
+      </div>
+
+      <div class="card">
+        <small>Mis gastos</small>
+        <strong id="private-expenses" class="negative">
+          0,00 €
+        </strong>
+      </div>
+
+      <div class="card">
+        <small>Mi balance</small>
+        <strong id="private-balance">
+          0,00 €
+        </strong>
+      </div>
+
+    </div>
+
+
+    <!-- CUENTAS PRIVADAS -->
+
+    <div class="card form-card">
+
+      <h2>💳 Mis cuentas</h2>
+
+      <label>
+        Nombre de la cuenta
+
+        <input
+          id="private-account-name"
+          type="text"
+          placeholder="Ej. Cuenta personal"
+        >
+
+      </label>
+
+
+      <label>
+        Saldo
+
+        <input
+          id="private-account-balance"
+          type="number"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0,00"
+        >
+
+      </label>
+
+
+      <button
+        id="save-private-account"
+        class="primary-button"
+      >
+        Añadir cuenta
+      </button>
+
+    </div>
+
+
+    <div id="private-accounts-list"></div>
+
+
+    <!-- MOVIMIENTO PRIVADO -->
+
+    <div class="card form-card">
+
+      <h2>💰 Movimiento privado</h2>
+
+
+      <div class="type-selector">
+
+        <button
+          id="private-expense-button"
+          class="type-button active"
+        >
+          💸 Gasto
+        </button>
+
+        <button
+          id="private-income-button"
+          class="type-button"
+        >
+          💰 Ingreso
+        </button>
+
+      </div>
+
+
+      <label>
+        Descripción
+
+        <input
+          id="private-description"
+          type="text"
+          placeholder="Ej. Nómina"
+        >
+
+      </label>
+
+
+      <label>
+        Importe
+
+        <input
+          id="private-amount"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0,00"
+        >
+
+      </label>
+
+
+      <label>
+        Categoría
+
+        <select id="private-category">
+
+          <option value="vivienda">
+            🏠 Vivienda
+          </option>
+
+          <option value="alimentacion">
+            🛒 Alimentación
+          </option>
+
+          <option value="transporte">
+            🚗 Transporte
+          </option>
+
+          <option value="ocio">
+            🎮 Ocio
+          </option>
+
+          <option value="salud">
+            ❤️ Salud
+          </option>
+
+          <option value="otros">
+            📦 Otros
+          </option>
+
+        </select>
+
+      </label>
+
+
+      <label>
+        Fecha
+
+        <input
+          id="private-date"
+          type="date"
+        >
+
+      </label>
+
+
+      <button
+        id="save-private-movement"
+        class="primary-button"
+      >
+        Guardar movimiento privado
+      </button>
+
+    </div>
+
+
+    <div id="private-movements-list"></div>
+
+
+    <!-- OBJETIVOS PRIVADOS -->
+
+    <div class="card form-card">
+
+      <h2>🎯 Objetivo privado</h2>
+
+
+      <label>
+        Nombre
+
+        <input
+          id="private-goal-name"
+          type="text"
+          placeholder="Ej. Coche"
+        >
+
+      </label>
+
+
+      <label>
+        Objetivo
+
+        <input
+          id="private-goal-target"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0,00"
+        >
+
+      </label>
+
+
+      <label>
+        Ahorrado actualmente
+
+        <input
+          id="private-goal-saved"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0,00"
+        >
+
+      </label>
+
+
+      <button
+        id="save-private-goal"
+        class="primary-button"
+      >
+        Crear objetivo privado
+      </button>
+
+    </div>
+
+
+    <div id="private-goals-list"></div>
+
+  </main>
+
+
+  <!-- NAVEGACIÓN -->
+
+  <nav id="bottom-navigation" class="bottom-navigation">
+
+    <button data-section="home">
+      🏠
+      <span>Inicio</span>
     </button>
 
-</nav>
+    <button data-section="movements">
+      💳
+      <span>Movimientos</span>
+    </button>
 
+    <button data-section="goals">
+      🎯
+      <span>Objetivos</span>
+    </button>
+
+    <button data-section="private">
+      🔒
+      <span>Mi cuenta</span>
+    </button>
+
+  </nav>
 
 </section>
 
 
-<script
-    type="module"
-    src="app.js"
-></script>
+<script type="module" src="app.js"></script>
 
 </body>
-
 </html>
