@@ -1,6 +1,6 @@
 const CACHE_NAME = "finanzas-hogar-v1";
 
-const FILES = [
+const APP_FILES = [
   "./",
   "./index.html",
   "./styles.css",
@@ -9,18 +9,31 @@ const FILES = [
   "./manifest.json"
 ];
 
+
+/* =========================================================
+   INSTALACIÓN
+========================================================= */
+
 self.addEventListener("install", event => {
 
   event.waitUntil(
 
     caches
       .open(CACHE_NAME)
-      .then(cache => cache.addAll(FILES))
-      .then(() => self.skipWaiting())
+      .then(cache =>
+        cache.addAll(APP_FILES)
+      )
 
   );
 
+  self.skipWaiting();
+
 });
+
+
+/* =========================================================
+   ACTIVACIÓN
+========================================================= */
 
 self.addEventListener("activate", event => {
 
@@ -29,59 +42,125 @@ self.addEventListener("activate", event => {
     caches
       .keys()
       .then(keys =>
+
         Promise.all(
+
           keys
-            .filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+            .filter(
+              key =>
+                key !== CACHE_NAME
+            )
+            .map(
+              key =>
+                caches.delete(key)
+            )
+
         )
+
       )
-      .then(() => self.clients.claim())
 
   );
 
-});
-
-self.addEventListener("fetch", event => {
-
-  if (event.request.method !== "GET") {
-    return;
-  }
-
-  const url = new URL(event.request.url);
-
-  if (url.origin !== location.origin) {
-    return;
-  }
-
-  event.respondWith(
-
-    caches.match(event.request)
-      .then(cached => {
-
-        if (cached) {
-          return cached;
-        }
-
-        return fetch(event.request)
-          .then(response => {
-
-            const copy = response.clone();
-
-            caches
-              .open(CACHE_NAME)
-              .then(cache =>
-                cache.put(event.request, copy)
-              );
-
-            return response;
-
-          })
-          .catch(() =>
-            caches.match("./index.html")
-          );
-
-      })
-
-  );
+  self.clients.claim();
 
 });
+
+
+/* =========================================================
+   PETICIONES
+========================================================= */
+
+self.addEventListener(
+  "fetch",
+  event => {
+
+    const request =
+      event.request;
+
+
+    /*
+      Firebase y Google deben ir
+      siempre contra Internet.
+    */
+
+    if (
+      request.url.includes(
+        "firebaseio.com"
+      )
+      ||
+      request.url.includes(
+        "googleapis.com"
+      )
+      ||
+      request.url.includes(
+        "gstatic.com"
+      )
+      ||
+      request.url.includes(
+        "google.com"
+      )
+    ) {
+
+      return;
+
+    }
+
+
+    event.respondWith(
+
+      caches
+        .match(request)
+        .then(cached => {
+
+          if (cached) {
+
+            return cached;
+
+          }
+
+
+          return fetch(request)
+            .then(response => {
+
+              if (
+                !response
+                ||
+                response.status !== 200
+              ) {
+
+                return response;
+
+              }
+
+
+              const clone =
+                response.clone();
+
+
+              caches
+                .open(CACHE_NAME)
+                .then(cache => {
+
+                  cache.put(
+                    request,
+                    clone
+                  );
+
+                });
+
+
+              return response;
+
+            })
+            .catch(() =>
+              caches.match(
+                "./index.html"
+              )
+            );
+
+        })
+
+    );
+
+  }
+);
