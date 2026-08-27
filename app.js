@@ -24,7 +24,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   limit,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -34,15 +33,13 @@ import {
    FIREBASE
 ========================================================= */
 
-const firebaseApp = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-const auth = getAuth(firebaseApp);
+const googleProvider = new GoogleAuthProvider();
 
-const db = getFirestore(firebaseApp);
-
-const provider = new GoogleAuthProvider();
-
-provider.setCustomParameters({
+googleProvider.setCustomParameters({
   prompt: "select_account"
 });
 
@@ -52,36 +49,51 @@ provider.setCustomParameters({
 ========================================================= */
 
 let currentUser = null;
-
 let currentHousehold = null;
-
 let currentMembers = [];
 
 let expenses = [];
-
 let contributions = [];
 
 let selectedMonth = getCurrentMonth();
-
 let editingExpenseId = null;
+
+let toastTimer = null;
 
 
 /* =========================================================
-   UTILIDAD DOM
+   DOM
 ========================================================= */
 
 const $ = id => document.getElementById(id);
+
+const setText = (id, value) => {
+  const element = $(id);
+  if (element) {
+    element.textContent = value;
+  }
+};
 
 
 /* =========================================================
    ARRANQUE
 ========================================================= */
 
-document.addEventListener(
-  "DOMContentLoaded",
-  initialiseUI
-);
+document.addEventListener("DOMContentLoaded", () => {
 
+  initialiseUI();
+
+  onAuthStateChanged(
+    auth,
+    handleAuthState
+  );
+
+});
+
+
+/* =========================================================
+   INTERFAZ
+========================================================= */
 
 function initialiseUI() {
 
@@ -97,15 +109,222 @@ function initialiseUI() {
       selectedMonth;
   }
 
-  if ($("annualYear")) {
-    $("annualYear").textContent =
-      new Date().getFullYear();
-  }
-
-  onAuthStateChanged(
-    auth,
-    handleAuthState
+  setText(
+    "annualYear",
+    new Date().getFullYear()
   );
+
+}
+
+
+/* =========================================================
+   EVENTOS
+========================================================= */
+
+function bindEvents() {
+
+  $("googleLogin")
+    ?.addEventListener(
+      "click",
+      loginWithGoogle
+    );
+
+
+  $("logout")
+    ?.addEventListener(
+      "click",
+      logout
+    );
+
+
+  $("settingsLogout")
+    ?.addEventListener(
+      "click",
+      logout
+    );
+
+
+  $("mobileMenu")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        $("sidebar")
+          ?.classList.toggle("open");
+
+      }
+    );
+
+
+  document
+    .querySelectorAll(".menu-item[data-page]")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => navigate(button.dataset.page)
+      );
+
+    });
+
+
+  document
+    .querySelectorAll("[data-go]")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => navigate(button.dataset.go)
+      );
+
+    });
+
+
+  $("monthSelector")
+    ?.addEventListener(
+      "change",
+      event => {
+
+        selectedMonth =
+          event.target.value;
+
+        refreshDashboard();
+
+      }
+    );
+
+
+  $("previousMonth")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        selectedMonth =
+          shiftMonth(
+            selectedMonth,
+            -1
+          );
+
+        if ($("monthSelector")) {
+          $("monthSelector").value =
+            selectedMonth;
+        }
+
+        refreshDashboard();
+
+      }
+    );
+
+
+  $("nextMonth")
+    ?.addEventListener(
+      "click",
+      () => {
+
+        selectedMonth =
+          shiftMonth(
+            selectedMonth,
+            1
+          );
+
+        if ($("monthSelector")) {
+          $("monthSelector").value =
+            selectedMonth;
+        }
+
+        refreshDashboard();
+
+      }
+    );
+
+
+  $("newExpense")
+    ?.addEventListener(
+      "click",
+      () => openExpenseModal()
+    );
+
+
+  $("expenseForm")
+    ?.addEventListener(
+      "submit",
+      saveExpense
+    );
+
+
+  $("expenseSearch")
+    ?.addEventListener(
+      "input",
+      renderExpenses
+    );
+
+
+  $("expenseFilter")
+    ?.addEventListener(
+      "change",
+      renderExpenses
+    );
+
+
+  $("newContribution")
+    ?.addEventListener(
+      "click",
+      openContributionModal
+    );
+
+
+  $("contributionForm")
+    ?.addEventListener(
+      "submit",
+      saveContribution
+    );
+
+
+  $("generateInvite")
+    ?.addEventListener(
+      "click",
+      generateInvite
+    );
+
+
+  $("joinHousehold")
+    ?.addEventListener(
+      "click",
+      joinHousehold
+    );
+
+
+  $("themeButton")
+    ?.addEventListener(
+      "click",
+      () => navigate("settings")
+    );
+
+
+  document
+    .querySelectorAll(".theme-option")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () =>
+          setTheme(button.dataset.theme)
+      );
+
+    });
+
+
+  document
+    .querySelectorAll(".close-modal")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        closeModals
+      );
+
+    });
+
 }
 
 
@@ -119,14 +338,21 @@ async function handleAuthState(user) {
 
   if (!user) {
 
+    currentHousehold = null;
+    currentMembers = [];
+    expenses = [];
+    contributions = [];
+
     showLogin();
 
     return;
   }
 
-  try {
 
-    showLoading();
+  showLoading();
+
+
+  try {
 
     await initialiseUser(user);
 
@@ -141,7 +367,7 @@ async function handleAuthState(user) {
   } catch (error) {
 
     console.error(
-      "Error inicializando usuario:",
+      "Error inicializando aplicación:",
       error
     );
 
@@ -151,7 +377,9 @@ async function handleAuthState(user) {
       getFirebaseErrorMessage(error),
       true
     );
+
   }
+
 }
 
 
@@ -168,13 +396,13 @@ async function loginWithGoogle() {
 
     await signInWithPopup(
       auth,
-      provider
+      googleProvider
     );
 
   } catch (error) {
 
     console.error(
-      "Error login:",
+      "Error de autenticación:",
       error
     );
 
@@ -187,6 +415,7 @@ async function loginWithGoogle() {
         getFirebaseErrorMessage(error),
         true
       );
+
     }
 
   } finally {
@@ -194,7 +423,9 @@ async function loginWithGoogle() {
     if (button) {
       button.disabled = false;
     }
+
   }
+
 }
 
 
@@ -204,30 +435,17 @@ async function logout() {
 
     await signOut(auth);
 
-    currentUser = null;
-
-    currentHousehold = null;
-
-    currentMembers = [];
-
-    expenses = [];
-
-    contributions = [];
-
-    showLogin();
-
   } catch (error) {
 
-    console.error(
-      "Error cerrando sesión:",
-      error
-    );
+    console.error(error);
 
     toast(
       "No se ha podido cerrar la sesión.",
       true
     );
+
   }
+
 }
 
 
@@ -244,6 +462,7 @@ async function initialiseUser(user) {
       user.uid
     );
 
+
   const userSnapshot =
     await getDoc(userRef);
 
@@ -254,19 +473,20 @@ async function initialiseUser(user) {
       user.uid,
 
     name:
-      user.displayName ||
-      "Usuario",
+      user.displayName
+      || "Usuario",
 
     email:
-      user.email ||
-      "",
+      user.email
+      || "",
 
     photo:
-      user.photoURL ||
-      "",
+      user.photoURL
+      || "",
 
     updatedAt:
       serverTimestamp()
+
   };
 
 
@@ -290,15 +510,16 @@ async function initialiseUser(user) {
         merge: true
       }
     );
+
   }
 
 
   /*
-    Buscar si el usuario pertenece
-    a algún hogar.
+    Buscar un hogar donde el usuario
+    figure como miembro.
   */
 
-  const householdsQuery =
+  const householdQuery =
     query(
       collection(
         db,
@@ -313,22 +534,24 @@ async function initialiseUser(user) {
     );
 
 
-  const snapshot =
+  const householdSnapshot =
     await getDocs(
-      householdsQuery
+      householdQuery
     );
 
 
-  if (!snapshot.empty) {
+  if (!householdSnapshot.empty) {
 
     currentHousehold =
-      snapshot.docs[0];
+      householdSnapshot.docs[0];
 
   } else {
 
     currentHousehold =
       await createHousehold(user);
+
   }
+
 }
 
 
@@ -361,6 +584,10 @@ async function createHousehold(user) {
     );
 
 
+  /*
+    Primero creamos el hogar.
+  */
+
   await setDoc(
     householdRef,
     {
@@ -371,19 +598,22 @@ async function createHousehold(user) {
       name:
         "Mi hogar",
 
-      inviteCode:
-        inviteCode,
+      inviteCode,
 
       memberIds:
-        [
-          user.uid
-        ],
+        [user.uid],
 
       createdAt:
         serverTimestamp()
+
     }
   );
 
+
+  /*
+    Después creamos al propietario
+    como miembro.
+  */
 
   await setDoc(
     memberRef,
@@ -393,28 +623,29 @@ async function createHousehold(user) {
         user.uid,
 
       name:
-        user.displayName ||
-        "Usuario",
+        user.displayName
+        || "Usuario",
 
       email:
-        user.email ||
-        "",
+        user.email
+        || "",
 
       photo:
-        user.photoURL ||
-        "",
+        user.photoURL
+        || "",
 
       role:
         "owner",
 
       joinedAt:
         serverTimestamp()
+
     }
   );
 
 
   /*
-    Guardamos el código de invitación.
+    Índice del código de invitación.
   */
 
   await setDoc(
@@ -430,22 +661,20 @@ async function createHousehold(user) {
 
       createdAt:
         serverTimestamp()
+
     }
   );
 
 
-  /*
-    Devolvemos el DocumentReference.
-  */
-
   return await getDoc(
     householdRef
   );
+
 }
 
 
 /* =========================================================
-   CÓDIGO INVITACIÓN
+   CÓDIGOS DE INVITACIÓN
 ========================================================= */
 
 async function createUniqueInviteCode() {
@@ -476,6 +705,7 @@ async function createUniqueInviteCode() {
             characters.length
           )
         ];
+
     }
 
 
@@ -488,26 +718,25 @@ async function createUniqueInviteCode() {
 
 
     const snapshot =
-      await getDoc(
-        codeRef
-      );
+      await getDoc(codeRef);
 
 
     if (!snapshot.exists()) {
-
       return code;
     }
+
   }
 
 
   throw new Error(
     "No se ha podido generar un código de invitación."
   );
+
 }
 
 
 /* =========================================================
-   CARGAR HOGAR
+   HOGAR
 ========================================================= */
 
 async function loadHousehold() {
@@ -528,6 +757,7 @@ async function loadHousehold() {
     throw new Error(
       "El hogar no existe."
     );
+
   }
 
 
@@ -535,28 +765,24 @@ async function loadHousehold() {
     householdSnapshot;
 
 
-  const membersRef =
-    collection(
-      db,
-      "households",
-      currentHousehold.id,
-      "members"
-    );
-
-
   const membersSnapshot =
     await getDocs(
-      membersRef
+      collection(
+        db,
+        "households",
+        currentHousehold.id,
+        "members"
+      )
     );
 
 
   currentMembers =
     membersSnapshot.docs.map(
-      member => ({
+      item => ({
         id:
-          member.id,
+          item.id,
 
-        ...member.data()
+        ...item.data()
       })
     );
 
@@ -566,18 +792,14 @@ async function loadHousehold() {
   populateMemberSelectors();
 
 
-  if ($("inviteCode")) {
+  setText(
+    "inviteCode",
+    currentHousehold.data().inviteCode
+    || "------"
+  );
 
-    $("inviteCode").textContent =
-      currentHousehold.data().inviteCode
-      || "------";
-  }
 }
 
-
-/* =========================================================
-   INVITACIÓN
-========================================================= */
 
 async function generateInvite() {
 
@@ -593,7 +815,8 @@ async function generateInvite() {
 
 
     const oldCode =
-      currentHousehold.data()
+      currentHousehold
+        .data()
         ?.inviteCode;
 
 
@@ -617,6 +840,7 @@ async function generateInvite() {
       ).catch(
         () => {}
       );
+
     }
 
 
@@ -633,21 +857,12 @@ async function generateInvite() {
 
         createdAt:
           serverTimestamp()
+
       }
     );
 
 
-    currentHousehold =
-      await getDoc(
-        currentHousehold.ref
-      );
-
-
-    if ($("inviteCode")) {
-
-      $("inviteCode").textContent =
-        newCode;
-    }
+    await loadHousehold();
 
 
     toast(
@@ -662,12 +877,14 @@ async function generateInvite() {
       getFirebaseErrorMessage(error),
       true
     );
+
   }
+
 }
 
 
 /* =========================================================
-   UNIRSE A HOGAR
+   UNIRSE A UN HOGAR
 ========================================================= */
 
 async function joinHousehold() {
@@ -684,17 +901,18 @@ async function joinHousehold() {
   const code =
     input?.value
       ?.trim()
-      ?.toUpperCase();
+      .toUpperCase();
 
 
   if (!code) {
 
     toast(
-      "Introduce el código de invitación.",
+      "Introduce el código.",
       true
     );
 
     return;
+
   }
 
 
@@ -706,39 +924,36 @@ async function joinHousehold() {
     );
 
     return;
+
   }
 
 
   try {
 
-    const joinCodeRef =
-      doc(
-        db,
-        "joinCodes",
-        code
-      );
-
-
     const joinSnapshot =
       await getDoc(
-        joinCodeRef
+        doc(
+          db,
+          "joinCodes",
+          code
+        )
       );
 
 
     if (!joinSnapshot.exists()) {
 
       toast(
-        "El código no existe o ha caducado.",
+        "El código no es válido.",
         true
       );
 
       return;
+
     }
 
 
     const householdId =
-      joinSnapshot.data()
-        .householdId;
+      joinSnapshot.data().householdId;
 
 
     const householdRef =
@@ -763,74 +978,79 @@ async function joinHousehold() {
       );
 
       return;
+
     }
 
 
-    const householdData =
-      householdSnapshot.data();
-
-
-    const memberIds =
-      Array.isArray(
-        householdData.memberIds
-      )
-        ? householdData.memberIds
-        : [];
-
-
-    if (
-      !memberIds.includes(
-        currentUser.uid
-      )
-    ) {
-
-      memberIds.push(
-        currentUser.uid
-      );
-
-
-      await updateDoc(
-        householdRef,
-        {
-          memberIds:
-            memberIds
-        }
-      );
-    }
-
-
-    await setDoc(
+    const memberRef =
       doc(
         db,
         "households",
         householdId,
         "members",
         currentUser.uid
-      ),
+      );
+
+
+    await setDoc(
+      memberRef,
       {
 
         uid:
           currentUser.uid,
 
         name:
-          currentUser.displayName ||
-          "Usuario",
+          currentUser.displayName
+          || "Usuario",
 
         email:
-          currentUser.email ||
-          "",
+          currentUser.email
+          || "",
 
         photo:
-          currentUser.photoURL ||
-          "",
+          currentUser.photoURL
+          || "",
 
         role:
           "member",
 
+        inviteCode:
+          code,
+
         joinedAt:
           serverTimestamp()
+
       }
     );
+
+
+    const existingIds =
+      householdSnapshot
+        .data()
+        .memberIds
+        || [];
+
+
+    if (
+      !existingIds.includes(
+        currentUser.uid
+      )
+    ) {
+
+      await updateDoc(
+        householdRef,
+        {
+
+          memberIds:
+            [
+              ...existingIds,
+              currentUser.uid
+            ]
+
+        }
+      );
+
+    }
 
 
     currentHousehold =
@@ -848,27 +1068,25 @@ async function joinHousehold() {
 
     await refreshAll();
 
+
     toast(
       "Te has unido al hogar correctamente."
     );
 
 
-    navigate(
-      "dashboard"
-    );
+    navigate("dashboard");
 
   } catch (error) {
 
-    console.error(
-      "Error uniéndose al hogar:",
-      error
-    );
+    console.error(error);
 
     toast(
       getFirebaseErrorMessage(error),
       true
     );
+
   }
+
 }
 
 
@@ -894,28 +1112,112 @@ async function loadExpenses() {
 
   const snapshot =
     await getDocs(
-      query(
-        expensesRef,
-        orderBy(
-          "date",
-          "desc"
-        )
-      )
+      expensesRef
     );
 
 
   expenses =
-    snapshot.docs.map(
-      item => ({
-        id:
-          item.id,
+    snapshot.docs
+      .map(
+        item => ({
+          id:
+            item.id,
 
-        ...item.data()
-      })
-    );
+          ...item.data()
+        })
+      )
+      .sort(
+        (a, b) =>
+          String(
+            b.date || ""
+          ).localeCompare(
+            String(
+              a.date || ""
+            )
+          )
+      );
 
 
   renderExpenses();
+
+}
+
+
+function openExpenseModal(
+  expense = null
+) {
+
+  editingExpenseId =
+    expense?.id
+    || null;
+
+
+  setText(
+    "expenseModalTitle",
+    expense
+      ? "Editar gasto"
+      : "Nuevo gasto"
+  );
+
+
+  if ($("expenseId")) {
+    $("expenseId").value =
+      expense?.id
+      || "";
+  }
+
+
+  if ($("expenseConcept")) {
+    $("expenseConcept").value =
+      expense?.concept
+      || "";
+  }
+
+
+  if ($("expenseAmount")) {
+    $("expenseAmount").value =
+      expense?.amount
+      ?? "";
+  }
+
+
+  if ($("expenseDate")) {
+    $("expenseDate").value =
+      expense?.date
+      || getToday();
+  }
+
+
+  if ($("expenseType")) {
+    $("expenseType").value =
+      expense?.type
+      || "common";
+  }
+
+
+  if ($("expenseCategory")) {
+    $("expenseCategory").value =
+      expense?.category
+      || "Otros";
+  }
+
+
+  populateMemberSelectors();
+
+
+  if ($("expenseMember")) {
+
+    $("expenseMember").value =
+      expense?.memberId
+      || currentUser?.uid
+      || "";
+
+  }
+
+
+  $("expenseModal")
+    ?.showModal();
+
 }
 
 
@@ -932,6 +1234,7 @@ async function saveExpense(event) {
     );
 
     return;
+
   }
 
 
@@ -959,16 +1262,16 @@ async function saveExpense(event) {
       || "common";
 
 
-  const category =
-    $("expenseCategory")
-      ?.value
-      || "Otros";
-
-
   const memberId =
     $("expenseMember")
       ?.value
       || currentUser.uid;
+
+
+  const category =
+    $("expenseCategory")
+      ?.value
+      || "Otros";
 
 
   if (!concept) {
@@ -979,6 +1282,7 @@ async function saveExpense(event) {
     );
 
     return;
+
   }
 
 
@@ -993,6 +1297,7 @@ async function saveExpense(event) {
     );
 
     return;
+
   }
 
 
@@ -1004,6 +1309,7 @@ async function saveExpense(event) {
     );
 
     return;
+
   }
 
 
@@ -1011,26 +1317,21 @@ async function saveExpense(event) {
 
     const data = {
 
-      concept:
-        concept,
+      concept,
 
-      amount:
-        amount,
+      amount,
 
-      date:
-        date,
+      date,
 
-      type:
-        type,
+      type,
 
-      category:
-        category,
+      category,
 
-      memberId:
-        memberId,
+      memberId,
 
       updatedAt:
         serverTimestamp()
+
     };
 
 
@@ -1071,6 +1372,7 @@ async function saveExpense(event) {
 
           createdAt:
             serverTimestamp()
+
         }
       );
 
@@ -1078,6 +1380,7 @@ async function saveExpense(event) {
       toast(
         "Gasto guardado."
       );
+
     }
 
 
@@ -1100,149 +1403,9 @@ async function saveExpense(event) {
       getFirebaseErrorMessage(error),
       true
     );
-  }
-}
 
-
-function openExpenseModal(
-  expense = null
-) {
-
-  editingExpenseId =
-    expense?.id
-    || null;
-
-
-  if ($("expenseModalTitle")) {
-
-    $("expenseModalTitle")
-      .textContent =
-        expense
-          ? "Editar gasto"
-          : "Nuevo gasto";
   }
 
-
-  if ($("expenseId")) {
-
-    $("expenseId").value =
-      expense?.id
-      || "";
-  }
-
-
-  if ($("expenseConcept")) {
-
-    $("expenseConcept").value =
-      expense?.concept
-      || "";
-  }
-
-
-  if ($("expenseAmount")) {
-
-    $("expenseAmount").value =
-      expense?.amount
-      ?? "";
-  }
-
-
-  if ($("expenseDate")) {
-
-    $("expenseDate").value =
-      expense?.date
-      || getToday();
-  }
-
-
-  if ($("expenseType")) {
-
-    $("expenseType").value =
-      expense?.type
-      || "common";
-  }
-
-
-  if ($("expenseCategory")) {
-
-    $("expenseCategory").value =
-      expense?.category
-      || "Otros";
-  }
-
-
-  populateMemberSelectors();
-
-
-  if ($("expenseMember")) {
-
-    $("expenseMember").value =
-      expense?.memberId
-      || currentUser.uid;
-  }
-
-
-  $("expenseModal")
-    ?.showModal();
-}
-
-
-async function deleteExpense(id) {
-
-  const expense =
-    expenses.find(
-      item =>
-        item.id === id
-    );
-
-
-  if (!expense) {
-    return;
-  }
-
-
-  const confirmed =
-    window.confirm(
-      `¿Quieres eliminar el gasto "${expense.concept}" de ${formatMoney(expense.amount)}?`
-    );
-
-
-  if (!confirmed) {
-    return;
-  }
-
-
-  try {
-
-    await deleteDoc(
-      doc(
-        db,
-        "households",
-        currentHousehold.id,
-        "expenses",
-        id
-      )
-    );
-
-
-    toast(
-      "Gasto eliminado."
-    );
-
-
-    await loadExpenses();
-
-    refreshDashboard();
-
-  } catch (error) {
-
-    console.error(error);
-
-    toast(
-      getFirebaseErrorMessage(error),
-      true
-    );
-  }
 }
 
 
@@ -1261,7 +1424,7 @@ function renderExpenses() {
     $("expenseSearch")
       ?.value
       ?.trim()
-      ?.toLowerCase()
+      .toLowerCase()
       || "";
 
 
@@ -1279,22 +1442,20 @@ function renderExpenses() {
 
     data =
       data.filter(
-        item =>
-
+        expense =>
           String(
-            item.concept || ""
+            expense.concept || ""
           )
             .toLowerCase()
             .includes(search)
-
           ||
-
           String(
-            item.category || ""
+            expense.category || ""
           )
             .toLowerCase()
             .includes(search)
       );
+
   }
 
 
@@ -1302,9 +1463,10 @@ function renderExpenses() {
 
     data =
       data.filter(
-        item =>
-          item.type === filter
+        expense =>
+          expense.type === filter
       );
+
   }
 
 
@@ -1319,6 +1481,7 @@ function renderExpenses() {
     `;
 
     return;
+
   }
 
 
@@ -1400,6 +1563,7 @@ function renderExpenses() {
 
           </tr>
         `;
+
       }
     ).join("");
 
@@ -1419,8 +1583,7 @@ function renderExpenses() {
               expenses.find(
                 item =>
                   item.id ===
-                  button.dataset
-                    .editExpense
+                  button.dataset.editExpense
               );
 
 
@@ -1429,8 +1592,10 @@ function renderExpenses() {
                 expense
               );
             }
+
           }
         );
+
       }
     );
 
@@ -1450,8 +1615,71 @@ function renderExpenses() {
                 .deleteExpense
             )
         );
+
       }
     );
+
+}
+
+
+async function deleteExpense(id) {
+
+  const expense =
+    expenses.find(
+      item =>
+        item.id === id
+    );
+
+
+  if (!expense) {
+    return;
+  }
+
+
+  if (
+    !window.confirm(
+      `¿Eliminar el gasto "${expense.concept}" de ${formatMoney(expense.amount)}?`
+    )
+  ) {
+
+    return;
+
+  }
+
+
+  try {
+
+    await deleteDoc(
+      doc(
+        db,
+        "households",
+        currentHousehold.id,
+        "expenses",
+        id
+      )
+    );
+
+
+    toast(
+      "Gasto eliminado."
+    );
+
+
+    await loadExpenses();
+
+    refreshDashboard();
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast(
+      getFirebaseErrorMessage(error),
+      true
+    );
+
+  }
+
 }
 
 
@@ -1466,7 +1694,7 @@ async function loadContributions() {
   }
 
 
-  const contributionsRef =
+  const ref =
     collection(
       db,
       "households",
@@ -1476,29 +1704,33 @@ async function loadContributions() {
 
 
   const snapshot =
-    await getDocs(
-      query(
-        contributionsRef,
-        orderBy(
-          "date",
-          "desc"
-        )
-      )
-    );
+    await getDocs(ref);
 
 
   contributions =
-    snapshot.docs.map(
-      item => ({
-        id:
-          item.id,
+    snapshot.docs
+      .map(
+        item => ({
+          id:
+            item.id,
 
-        ...item.data()
-      })
-    );
+          ...item.data()
+        })
+      )
+      .sort(
+        (a, b) =>
+          String(
+            b.date || ""
+          ).localeCompare(
+            String(
+              a.date || ""
+            )
+          )
+      );
 
 
   renderContributions();
+
 }
 
 
@@ -1508,41 +1740,37 @@ function openContributionModal() {
 
 
   if ($("contributionDate")) {
-
     $("contributionDate").value =
       getToday();
   }
 
 
   if ($("contributionAmount")) {
-
     $("contributionAmount").value =
       "";
   }
 
 
   if ($("contributionConcept")) {
-
     $("contributionConcept").value =
       "Aportación mensual";
   }
 
 
   if ($("contributionMember")) {
-
     $("contributionMember").value =
-      currentUser.uid;
+      currentUser?.uid
+      || "";
   }
 
 
   $("contributionModal")
     ?.showModal();
+
 }
 
 
-async function saveContribution(
-  event
-) {
+async function saveContribution(event) {
 
   event.preventDefault();
 
@@ -1555,6 +1783,7 @@ async function saveContribution(
     );
 
     return;
+
   }
 
 
@@ -1594,6 +1823,7 @@ async function saveContribution(
     );
 
     return;
+
   }
 
 
@@ -1605,6 +1835,7 @@ async function saveContribution(
     );
 
     return;
+
   }
 
 
@@ -1619,23 +1850,20 @@ async function saveContribution(
       ),
       {
 
-        memberId:
-          memberId,
+        memberId,
 
-        amount:
-          amount,
+        amount,
 
-        date:
-          date,
+        date,
 
-        concept:
-          concept,
+        concept,
 
         createdBy:
           currentUser.uid,
 
         createdAt:
           serverTimestamp()
+
       }
     );
 
@@ -1660,7 +1888,9 @@ async function saveContribution(
       getFirebaseErrorMessage(error),
       true
     );
+
   }
+
 }
 
 
@@ -1686,6 +1916,7 @@ function renderContributions() {
     `;
 
     return;
+
   }
 
 
@@ -1742,6 +1973,7 @@ function renderContributions() {
 
           </tr>
         `;
+
       }
     ).join("");
 
@@ -1761,14 +1993,14 @@ function renderContributions() {
                 .deleteContribution
             )
         );
+
       }
     );
+
 }
 
 
-async function deleteContribution(
-  id
-) {
+async function deleteContribution(id) {
 
   const contribution =
     contributions.find(
@@ -1784,11 +2016,12 @@ async function deleteContribution(
 
   if (
     !window.confirm(
-      `¿Quieres eliminar esta aportación de ${formatMoney(contribution.amount)}?`
+      `¿Eliminar esta aportación de ${formatMoney(contribution.amount)}?`
     )
   ) {
 
     return;
+
   }
 
 
@@ -1822,7 +2055,9 @@ async function deleteContribution(
       getFirebaseErrorMessage(error),
       true
     );
+
   }
+
 }
 
 
@@ -1837,17 +2072,15 @@ function refreshDashboard() {
   }
 
 
-  const month =
-    selectedMonth;
-
-
   const monthExpenses =
     expenses.filter(
       expense =>
         String(
           expense.date || ""
         )
-          .startsWith(month)
+          .startsWith(
+            selectedMonth
+          )
     );
 
 
@@ -1857,7 +2090,9 @@ function refreshDashboard() {
         String(
           contribution.date || ""
         )
-          .startsWith(month)
+          .startsWith(
+            selectedMonth
+          )
     );
 
 
@@ -1886,75 +2121,63 @@ function refreshDashboard() {
 
 
   /*
-    AHORRO COMÚN =
-    APORTACIONES - GASTOS COMUNES
+    Ahorro común:
+
+    aportaciones al hogar
+    MENOS
+    gastos comunes
   */
 
   const saving =
-    contributed -
-    common;
+    contributed - common;
 
 
   setText(
     "dashboardContributions",
-    formatMoney(
-      contributed
-    )
+    formatMoney(contributed)
   );
 
 
   setText(
     "dashboardCommon",
-    formatMoney(
-      common
-    )
+    formatMoney(common)
   );
 
 
   setText(
     "dashboardIndividual",
-    formatMoney(
-      individual
-    )
+    formatMoney(individual)
   );
 
 
   setText(
     "dashboardSaving",
-    formatMoney(
-      saving
-    )
+    formatMoney(saving)
   );
 
 
   setText(
     "commonBarValue",
-    formatMoney(
-      common
-    )
+    formatMoney(common)
   );
 
 
   setText(
     "individualBarValue",
-    formatMoney(
-      individual
-    )
+    formatMoney(individual)
   );
 
 
   setText(
     "savingBarValue",
-    formatMoney(
-      saving
-    )
+    formatMoney(saving)
   );
 
 
   setText(
     "currentPeriodLabel",
     formatMonth(
-      month
+      selectedMonth
     )
   );
 
@@ -1962,12 +2185,7 @@ function refreshDashboard() {
   const base =
     Math.max(
       contributed,
-      common +
-      individual +
-      Math.max(
-        saving,
-        0
-      ),
+      common + individual,
       1
     );
 
@@ -1996,17 +2214,17 @@ function refreshDashboard() {
   refreshAnnual();
 
   renderRecentMovements();
+
 }
 
 
 function refreshAnnual() {
 
   const year =
-    selectedMonth
-      .substring(
-        0,
-        4
-      );
+    selectedMonth.substring(
+      0,
+      4
+    );
 
 
   const yearExpenses =
@@ -2054,8 +2272,7 @@ function refreshAnnual() {
 
 
   const saving =
-    contributed -
-    common;
+    contributed - common;
 
 
   setText(
@@ -2066,34 +2283,27 @@ function refreshAnnual() {
 
   setText(
     "annualContributions",
-    formatMoney(
-      contributed
-    )
+    formatMoney(contributed)
   );
 
 
   setText(
     "annualCommon",
-    formatMoney(
-      common
-    )
+    formatMoney(common)
   );
 
 
   setText(
     "annualIndividual",
-    formatMoney(
-      individual
-    )
+    formatMoney(individual)
   );
 
 
   setText(
     "annualSaving",
-    formatMoney(
-      saving
-    )
+    formatMoney(saving)
   );
+
 }
 
 
@@ -2142,13 +2352,12 @@ function renderRecentMovements() {
     .sort(
       (a, b) =>
         String(
-          b.movementDate
-        )
-          .localeCompare(
-            String(
-              a.movementDate
-            )
+          b.movementDate || ""
+        ).localeCompare(
+          String(
+            a.movementDate || ""
           )
+        )
     )
     .slice(
       0,
@@ -2165,6 +2374,7 @@ function renderRecentMovements() {
     `;
 
     return;
+
   }
 
 
@@ -2172,7 +2382,7 @@ function renderRecentMovements() {
     movements.map(
       item => {
 
-        const contribution =
+        const isContribution =
           item.movementType ===
           "contribution";
 
@@ -2195,11 +2405,13 @@ function renderRecentMovements() {
                 )}
                 ·
                 ${
-                  contribution
+                  isContribution
                     ? "Aportación"
-                    : item.type === "common"
-                      ? "Gasto común"
-                      : "Gasto individual"
+                    : (
+                      item.type === "common"
+                        ? "Gasto común"
+                        : "Gasto individual"
+                    )
                 }
               </small>
 
@@ -2207,7 +2419,7 @@ function renderRecentMovements() {
 
             <span class="badge">
               ${
-                contribution
+                isContribution
                   ? "Entrada"
                   : "Salida"
               }
@@ -2215,7 +2427,7 @@ function renderRecentMovements() {
 
             <strong>
               ${
-                contribution
+                isContribution
                   ? "+"
                   : "-"
               }
@@ -2226,8 +2438,10 @@ function renderRecentMovements() {
 
           </div>
         `;
+
       }
     ).join("");
+
 }
 
 
@@ -2248,13 +2462,11 @@ function renderMembers() {
 
   if (!currentMembers.length) {
 
-    container.innerHTML = `
-      <p class="empty">
-        No hay miembros registrados.
-      </p>
-    `;
+    container.innerHTML =
+      "<p>No hay miembros.</p>";
 
     return;
+
   }
 
 
@@ -2316,16 +2528,21 @@ function renderMembers() {
 
           </div>
         `;
+
       }
     ).join("");
+
 }
 
 
 function populateMemberSelectors() {
 
   const selectors = [
+
     $("expenseMember"),
+
     $("contributionMember")
+
   ];
 
 
@@ -2342,19 +2559,17 @@ function populateMemberSelectors() {
 
 
       select.innerHTML =
-        currentMembers
-          .map(
-            member => `
-              <option
-                value="${escapeAttribute(member.uid)}">
-                ${escapeHtml(
-                  member.name
-                  || "Usuario"
-                )}
-              </option>
-            `
-          )
-          .join("");
+        currentMembers.map(
+          member => `
+            <option
+              value="${escapeAttribute(member.uid)}">
+              ${escapeHtml(
+                member.name
+                || "Usuario"
+              )}
+            </option>
+          `
+        ).join("");
 
 
       if (
@@ -2374,9 +2589,12 @@ function populateMemberSelectors() {
 
         select.value =
           currentUser.uid;
+
       }
+
     }
   );
+
 }
 
 
@@ -2386,6 +2604,7 @@ function getMember(uid) {
     member =>
       member.uid === uid
   );
+
 }
 
 
@@ -2414,6 +2633,7 @@ function navigate(page) {
     target.classList.remove(
       "hidden"
     );
+
   }
 
 
@@ -2429,6 +2649,7 @@ function navigate(page) {
           button.dataset.page ===
           page
         );
+
       }
     );
 
@@ -2449,6 +2670,7 @@ function navigate(page) {
 
     settings:
       "Configuración"
+
   };
 
 
@@ -2465,238 +2687,15 @@ function navigate(page) {
     );
 
 
-  if (page === "household") {
+  if (
+    page === "household"
+    && currentHousehold
+  ) {
 
     loadHousehold();
+
   }
-}
 
-
-/* =========================================================
-   EVENTOS
-========================================================= */
-
-function bindEvents() {
-
-  $("googleLogin")
-    ?.addEventListener(
-      "click",
-      loginWithGoogle
-    );
-
-
-  $("logout")
-    ?.addEventListener(
-      "click",
-      logout
-    );
-
-
-  $("settingsLogout")
-    ?.addEventListener(
-      "click",
-      logout
-    );
-
-
-  $("mobileMenu")
-    ?.addEventListener(
-      "click",
-      () =>
-        $("sidebar")
-          ?.classList.toggle(
-            "open"
-          )
-    );
-
-
-  document
-    .querySelectorAll(
-      ".menu-item[data-page]"
-    )
-    .forEach(
-      button =>
-        button.addEventListener(
-          "click",
-          () =>
-            navigate(
-              button.dataset.page
-            )
-        )
-    );
-
-
-  document
-    .querySelectorAll(
-      "[data-go]"
-    )
-    .forEach(
-      button =>
-        button.addEventListener(
-          "click",
-          () =>
-            navigate(
-              button.dataset.go
-            )
-        )
-    );
-
-
-  $("monthSelector")
-    ?.addEventListener(
-      "change",
-      event => {
-
-        selectedMonth =
-          event.target.value;
-
-        refreshDashboard();
-      }
-    );
-
-
-  $("previousMonth")
-    ?.addEventListener(
-      "click",
-      () => {
-
-        selectedMonth =
-          shiftMonth(
-            selectedMonth,
-            -1
-          );
-
-
-        if ($("monthSelector")) {
-
-          $("monthSelector").value =
-            selectedMonth;
-        }
-
-
-        refreshDashboard();
-      }
-    );
-
-
-  $("nextMonth")
-    ?.addEventListener(
-      "click",
-      () => {
-
-        selectedMonth =
-          shiftMonth(
-            selectedMonth,
-            1
-          );
-
-
-        if ($("monthSelector")) {
-
-          $("monthSelector").value =
-            selectedMonth;
-        }
-
-
-        refreshDashboard();
-      }
-    );
-
-
-  $("newExpense")
-    ?.addEventListener(
-      "click",
-      () =>
-        openExpenseModal()
-    );
-
-
-  $("expenseForm")
-    ?.addEventListener(
-      "submit",
-      saveExpense
-    );
-
-
-  $("expenseSearch")
-    ?.addEventListener(
-      "input",
-      renderExpenses
-    );
-
-
-  $("expenseFilter")
-    ?.addEventListener(
-      "change",
-      renderExpenses
-    );
-
-
-  $("newContribution")
-    ?.addEventListener(
-      "click",
-      openContributionModal
-    );
-
-
-  $("contributionForm")
-    ?.addEventListener(
-      "submit",
-      saveContribution
-    );
-
-
-  $("generateInvite")
-    ?.addEventListener(
-      "click",
-      generateInvite
-    );
-
-
-  $("joinHousehold")
-    ?.addEventListener(
-      "click",
-      joinHousehold
-    );
-
-
-  $("themeButton")
-    ?.addEventListener(
-      "click",
-      () =>
-        navigate(
-          "settings"
-        )
-    );
-
-
-  document
-    .querySelectorAll(
-      ".theme-option"
-    )
-    .forEach(
-      button =>
-        button.addEventListener(
-          "click",
-          () =>
-            setTheme(
-              button.dataset.theme
-            )
-        )
-    );
-
-
-  document
-    .querySelectorAll(
-      ".close-modal"
-    )
-    .forEach(
-      button =>
-        button.addEventListener(
-          "click",
-          closeModals
-        )
-    );
 }
 
 
@@ -2707,17 +2706,17 @@ function bindEvents() {
 function closeModals() {
 
   document
-    .querySelectorAll(
-      "dialog"
-    )
+    .querySelectorAll("dialog")
     .forEach(
       dialog => {
 
         if (dialog.open) {
           dialog.close();
         }
+
       }
     );
+
 }
 
 
@@ -2728,21 +2727,22 @@ function closeModals() {
 function setTheme(theme) {
 
   const themes = [
+
     "classic",
     "modern",
     "clean",
     "dark"
+
   ];
 
 
   if (
-    !themes.includes(
-      theme
-    )
+    !themes.includes(theme)
   ) {
 
     theme =
       "classic";
+
   }
 
 
@@ -2762,18 +2762,97 @@ function setTheme(theme) {
       ".theme-option"
     )
     .forEach(
-      button =>
+      button => {
+
         button.classList.toggle(
           "active",
           button.dataset.theme ===
           theme
-        )
+        );
+
+      }
     );
+
 }
 
 
 /* =========================================================
-   INTERFAZ USUARIO
+   PANTALLAS
+========================================================= */
+
+function showLoading() {
+
+  $("loadingScreen")
+    ?.classList.remove(
+      "hidden"
+    );
+
+
+  $("loginScreen")
+    ?.classList.add(
+      "hidden"
+    );
+
+
+  $("app")
+    ?.classList.add(
+      "hidden"
+    );
+
+}
+
+
+function showLogin() {
+
+  $("loadingScreen")
+    ?.classList.add(
+      "hidden"
+    );
+
+
+  $("loginScreen")
+    ?.classList.remove(
+      "hidden"
+    );
+
+
+  $("app")
+    ?.classList.add(
+      "hidden"
+    );
+
+}
+
+
+function showApp() {
+
+  $("loadingScreen")
+    ?.classList.add(
+      "hidden"
+    );
+
+
+  $("loginScreen")
+    ?.classList.add(
+      "hidden"
+    );
+
+
+  $("app")
+    ?.classList.remove(
+      "hidden"
+    );
+
+
+  navigate(
+    "dashboard"
+  );
+
+}
+
+
+/* =========================================================
+   USUARIO EN PANTALLA
 ========================================================= */
 
 function updateUserInterface() {
@@ -2822,112 +2901,73 @@ function updateUserInterface() {
   );
 
 
+  const initial =
+    name
+      .charAt(0)
+      .toUpperCase();
+
+
+  setText(
+    "userInitial",
+    initial
+  );
+
+
+  setText(
+    "settingsInitial",
+    initial
+  );
+
+
   if (
-    photo &&
     $("userPhoto")
   ) {
 
     $("userPhoto").src =
       photo;
+
+    $("userPhoto").style.display =
+      photo
+        ? "block"
+        : "none";
+
   }
 
 
   if (
-    photo &&
     $("settingsPhoto")
   ) {
 
     $("settingsPhoto").src =
       photo;
+
+    $("settingsPhoto").style.display =
+      photo
+        ? "block"
+        : "none";
+
   }
+
 }
 
 
 /* =========================================================
-   PANTALLAS
-========================================================= */
-
-function showLoading() {
-
-  $("loadingScreen")
-    ?.classList.remove(
-      "hidden"
-    );
-
-
-  $("loginScreen")
-    ?.classList.add(
-      "hidden"
-    );
-
-
-  $("app")
-    ?.classList.add(
-      "hidden"
-    );
-}
-
-
-function showLogin() {
-
-  $("loadingScreen")
-    ?.classList.add(
-      "hidden"
-    );
-
-
-  $("loginScreen")
-    ?.classList.remove(
-      "hidden"
-    );
-
-
-  $("app")
-    ?.classList.add(
-      "hidden"
-    );
-}
-
-
-function showApp() {
-
-  $("loadingScreen")
-    ?.classList.add(
-      "hidden"
-    );
-
-
-  $("loginScreen")
-    ?.classList.add(
-      "hidden"
-    );
-
-
-  $("app")
-    ?.classList.remove(
-      "hidden"
-    );
-
-
-  navigate(
-    "dashboard"
-  );
-}
-
-
-/* =========================================================
-   DATOS
+   CARGA COMPLETA
 ========================================================= */
 
 async function refreshAll() {
 
   await Promise.all([
+
     loadExpenses(),
+
     loadContributions()
+
   ]);
 
 
   refreshDashboard();
+
 }
 
 
@@ -2966,6 +3006,7 @@ function getToday() {
 
 
   return `${year}-${month}-${day}`;
+
 }
 
 
@@ -2976,6 +3017,7 @@ function getCurrentMonth() {
       0,
       7
     );
+
 }
 
 
@@ -3004,12 +3046,11 @@ function shiftMonth(
   return `${date.getFullYear()}-${String(
     date.getMonth() + 1
   ).padStart(2, "0")}`;
+
 }
 
 
-function formatMonth(
-  value
-) {
+function formatMonth(value) {
 
   if (!value) {
     return "";
@@ -3031,22 +3072,24 @@ function formatMonth(
     );
 
 
-  return date.toLocaleDateString(
-    "es-ES",
-    {
-      month:
-        "long",
+  return date
+    .toLocaleDateString(
+      "es-ES",
+      {
 
-      year:
-        "numeric"
-    }
-  );
+        month:
+          "long",
+
+        year:
+          "numeric"
+
+      }
+    );
+
 }
 
 
-function formatDate(
-  value
-) {
+function formatDate(value) {
 
   if (!value) {
     return "—";
@@ -3059,15 +3102,15 @@ function formatDate(
     );
 
 
-  return date.toLocaleDateString(
-    "es-ES"
-  );
+  return date
+    .toLocaleDateString(
+      "es-ES"
+    );
+
 }
 
 
-function formatMoney(
-  value
-) {
+function formatMoney(value) {
 
   return new Intl.NumberFormat(
     "es-ES",
@@ -3080,17 +3123,15 @@ function formatMoney(
         "EUR"
 
     }
-  )
-    .format(
-      Number(value)
-      || 0
-    );
+  ).format(
+    Number(value)
+    || 0
+  );
+
 }
 
 
-function sum(
-  items
-) {
+function sum(items) {
 
   return items.reduce(
     (
@@ -3104,23 +3145,7 @@ function sum(
       ),
     0
   );
-}
 
-
-function setText(
-  id,
-  value
-) {
-
-  const element =
-    $(id);
-
-
-  if (element) {
-
-    element.textContent =
-      value;
-  }
 }
 
 
@@ -3138,21 +3163,24 @@ function setWidth(
   }
 
 
-  element.style.width =
-    `${Math.min(
+  const width =
+    Math.min(
       Math.max(
         Number(value)
         || 0,
         0
       ),
       100
-    )}%`;
+    );
+
+
+  element.style.width =
+    `${width}%`;
+
 }
 
 
-function escapeHtml(
-  value
-) {
+function escapeHtml(value) {
 
   return String(
     value ?? ""
@@ -3177,21 +3205,22 @@ function escapeHtml(
       "'",
       "&#039;"
     );
+
 }
 
 
-function escapeAttribute(
-  value
-) {
+function escapeAttribute(value) {
 
   return escapeHtml(
     value
   );
+
 }
 
 
-let toastTimer = null;
-
+/* =========================================================
+   MENSAJES
+========================================================= */
 
 function toast(
   message,
@@ -3229,12 +3258,16 @@ function toast(
 
   toastTimer =
     setTimeout(
-      () =>
+      () => {
+
         element.classList.remove(
           "show"
-        ),
+        );
+
+      },
       3500
     );
+
 }
 
 
@@ -3248,6 +3281,7 @@ function getFirebaseErrorMessage(
   ) {
 
     return "Firebase ha rechazado el acceso. Comprueba las reglas de Firestore.";
+
   }
 
 
@@ -3257,6 +3291,7 @@ function getFirebaseErrorMessage(
   ) {
 
     return "El navegador ha bloqueado la ventana de Google.";
+
   }
 
 
@@ -3266,6 +3301,7 @@ function getFirebaseErrorMessage(
   ) {
 
     return "Este dominio no está autorizado en Firebase Authentication.";
+
   }
 
 
@@ -3275,6 +3311,17 @@ function getFirebaseErrorMessage(
   ) {
 
     return "El acceso mediante Google no está habilitado en Firebase.";
+
+  }
+
+
+  if (
+    error?.code ===
+    "failed-precondition"
+  ) {
+
+    return "Firebase necesita completar una configuración antes de continuar.";
+
   }
 
 
@@ -3283,6 +3330,7 @@ function getFirebaseErrorMessage(
     ||
     "Se ha producido un error."
   );
+
 }
 
 
@@ -3309,6 +3357,8 @@ if (
               error
             )
         );
+
     }
   );
+
 }
