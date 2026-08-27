@@ -1,0 +1,11 @@
+{
+  "name": "Finanzas Hogar",
+  "short_name": "Finanzas",
+  "description": "Gestión financiera compartida y privada",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "lang": "es"
+}
