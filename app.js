@@ -568,21 +568,35 @@ async function createHousehold(user) {
 
 
   await setDoc(
-    doc(
-      db,
-      "joinCodes",
-      inviteCode
-    ),
-    {
+  memberRef,
+  {
 
-      householdId:
-        householdRef.id,
+    uid:
+      currentUser.uid,
 
-      createdAt:
-        serverTimestamp()
+    name:
+      currentUser.displayName
+      || "Usuario",
 
-    }
-  );
+    email:
+      currentUser.email
+      || "",
+
+    photo:
+      currentUser.photoURL
+      || "",
+
+    role:
+      "member",
+
+    inviteCode:
+      code,
+
+    joinedAt:
+      serverTimestamp()
+
+  }
+);
 
 
   return householdRef;
