@@ -5,177 +5,264 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
 
-    /* ================================================
-       USUARIO
-    ================================================ */
+    /* =====================================================
+       FUNCIONES
+    ===================================================== */
 
-    match /users/{uid} {
+    function signedIn() {
 
-      allow read, create, update, delete:
-        if request.auth != null
-        && request.auth.uid == uid;
-
-
-      /* ================================================
-         MOVIMIENTOS PRIVADOS
-      ================================================ */
-
-      match /privateMovements/{movementId} {
-
-        allow read, create, update, delete:
-          if request.auth != null
-          && request.auth.uid == uid;
-
-      }
-
-
-      /* ================================================
-         CUENTAS PRIVADAS
-      ================================================ */
-
-      match /accounts/{accountId} {
-
-        allow read, create, update, delete:
-          if request.auth != null
-          && request.auth.uid == uid;
-
-      }
+      return request.auth != null;
 
     }
 
 
-    /* ================================================
-       HOGAR
-    ================================================ */
+    function isUser(uid) {
 
-    match /homes/{homeId} {
+      return signedIn()
+        && request.auth.uid == uid;
+
+    }
 
 
-      /* ================================================
+    function isMember(householdId) {
+
+      return signedIn()
+        && exists(
+          /databases/$(database)
+          /documents/households/$(householdId)
+          /members/$(request.auth.uid)
+        );
+
+    }
+
+
+    function isOwner(householdId) {
+
+      return signedIn()
+        && get(
+          /databases/$(database)
+          /documents/households/$(householdId)
+        ).data.ownerId
+        == request.auth.uid;
+
+    }
+
+
+    /* =====================================================
+       USUARIOS
+    ===================================================== */
+
+    match /users/{uid} {
+
+      allow create:
+        if isUser(uid);
+
+      allow read, update:
+        if isUser(uid);
+
+      allow delete:
+        if false;
+
+    }
+
+
+    /* =====================================================
+       CÓDIGOS DE INVITACIÓN
+    ===================================================== */
+
+    match /joinCodes/{code} {
+
+      /*
+        Un usuario autenticado puede consultar
+        un código concreto.
+
+        No puede listar todos los códigos.
+      */
+
+      allow get:
+        if signedIn();
+
+      allow list:
+        if false;
+
+      /*
+        La aplicación crea los códigos al crear
+        o cambiar un hogar.
+      */
+
+      allow create:
+        if signedIn();
+
+      allow update:
+        if signedIn();
+
+      allow delete:
+        if signedIn();
+
+    }
+
+
+    /* =====================================================
+       HOGARES
+    ===================================================== */
+
+    match /households/{householdId} {
+
+
+      /*
+        Crear hogar:
+        únicamente el usuario autenticado
+        que se establece como propietario.
+      */
+
+      allow create:
+        if signedIn()
+        && request.resource.data.ownerId
+           == request.auth.uid;
+
+
+      /*
+        Leer hogar:
+        únicamente sus miembros.
+      */
+
+      allow get:
+        if isMember(householdId);
+
+
+      allow list:
+        if false;
+
+
+      /*
+        Modificar hogar:
+        únicamente propietario.
+      */
+
+      allow update:
+        if isOwner(householdId);
+
+
+      allow delete:
+        if false;
+
+
+      /* =================================================
          MIEMBROS
-      ================================================ */
+      ================================================= */
 
       match /members/{uid} {
 
+
+        /*
+          Los miembros del hogar pueden consultar
+          los miembros.
+        */
+
         allow read:
-          if request.auth != null
+          if isMember(householdId);
+
+
+        /*
+          Un usuario puede darse de alta a sí mismo
+          usando un código de invitación válido.
+        */
+
+        allow create:
+          if signedIn()
+          && uid == request.auth.uid
           && exists(
             /databases/$(database)
-            /documents/homes/$(homeId)
-            /members/$(request.auth.uid)
+            /documents/joinCodes/$(request.resource.data.inviteCode)
+          )
+          && get(
+            /databases/$(database)
+            /documents/joinCodes/$(request.resource.data.inviteCode)
+          ).data.householdId
+             == householdId;
+
+
+        /*
+          El propietario puede crear miembros.
+        */
+
+        allow create:
+          if isOwner(householdId);
+
+
+        /*
+          Un usuario puede actualizar sus propios datos.
+        */
+
+        allow update:
+          if isOwner(householdId)
+          || (
+            signedIn()
+            && uid == request.auth.uid
           );
+
+
+        /*
+          El propietario puede eliminar miembros.
+        */
+
+        allow delete:
+          if isOwner(householdId)
+          && uid != request.auth.uid;
+
+      }
+
+
+      /* =================================================
+         GASTOS
+      ================================================= */
+
+      match /expenses/{expenseId} {
+
+
+        allow read:
+          if isMember(householdId);
 
 
         allow create:
-          if request.auth != null
-          && request.auth.uid == uid;
+          if isMember(householdId)
+          && request.resource.data.createdBy
+             == request.auth.uid;
 
 
-        allow update, delete:
-          if request.auth != null
-          && request.auth.uid == uid;
+        allow update:
+          if isMember(householdId);
 
-      }
-
-
-      /* ================================================
-         DOCUMENTO DEL HOGAR
-      ================================================ */
-
-      allow read:
-        if request.auth != null
-        && exists(
-          /databases/$(database)
-          /documents/homes/$(homeId)
-          /members/$(request.auth.uid)
-        );
-
-
-      allow create:
-        if request.auth != null;
-
-
-      allow update:
-        if request.auth != null
-        && exists(
-          /databases/$(database)
-          /documents/homes/$(homeId)
-          /members/$(request.auth.uid)
-        );
-
-
-      /* ================================================
-         MOVIMIENTOS COMUNES
-      ================================================ */
-
-      match /movements/{movementId} {
-
-        allow read, create, update, delete:
-          if request.auth != null
-          && exists(
-            /databases/$(database)
-            /documents/homes/$(homeId)
-            /members/$(request.auth.uid)
-          );
-
-      }
-
-
-      /* ================================================
-         OBJETIVOS
-      ================================================ */
-
-      match /goals/{goalId} {
-
-        allow read, create, update, delete:
-          if request.auth != null
-          && exists(
-            /databases/$(database)
-            /documents/homes/$(homeId)
-            /members/$(request.auth.uid)
-          );
-
-      }
-
-
-      /* ================================================
-         RECURRENTES
-      ================================================ */
-
-      match /recurring/{recurringId} {
-
-        allow read, create, update, delete:
-          if request.auth != null
-          && exists(
-            /databases/$(database)
-            /documents/homes/$(homeId)
-            /members/$(request.auth.uid)
-          );
-
-      }
-
-
-      /* ================================================
-         INVITACIONES
-      ================================================ */
-
-      match /invitations/{invitationId} {
-
-        allow read, create, update:
-          if request.auth != null
-          && exists(
-            /databases/$(database)
-            /documents/homes/$(homeId)
-            /members/$(request.auth.uid)
-          );
 
         allow delete:
-          if request.auth != null
-          && exists(
-            /databases/$(database)
-            /documents/homes/$(homeId)
-            /members/$(request.auth.uid)
-          );
+          if isMember(householdId);
+
+      }
+
+
+      /* =================================================
+         APORTACIONES
+      ================================================= */
+
+      match /contributions/{contributionId} {
+
+
+        allow read:
+          if isMember(householdId);
+
+
+        allow create:
+          if isMember(householdId)
+          && request.resource.data.createdBy
+             == request.auth.uid;
+
+
+        allow update:
+          if isMember(householdId);
+
+
+        allow delete:
+          if isMember(householdId);
 
       }
 
