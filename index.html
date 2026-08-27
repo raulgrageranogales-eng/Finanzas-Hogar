@@ -3,14 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="theme-color" content="#2563eb">
+    <meta name="description" content="Gestión financiera compartida y privada">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+
     <title>Finanzas Hogar</title>
 </head>
 
 <body>
 
-    <h1>Finanzas Hogar</h1>
+    <!-- LOGIN -->
+    <section id="login-screen" class="screen">
+        <div class="login-card">
 
-    <p>Proyecto iniciado correctamente.</p>
+            <div class="logo">💰</div>
+
+            <h1>Finanzas Hogar</h1>
+
+            <p>
+                Tu economía.<br>
+                Compartida y privada.
+            </p>
+
+            <button id="google-login" class="google-button">
+                <span>G</span>
+                Continuar con Google
+            </button>
+
+            <p id="login-error" class="error"></p>
+
+        </div>
+    </section>
+
+
+    <!-- APP -->
+    <section id="app-screen" class="screen hidden">
+
+        <header class="app-header">
+
+            <div>
+                <small>Bienvenido</small>
+                <h2 id="user-name">Usuario</h2>
+            </div>
+
+            <button id="logout-button" class="logout-button">
+                Salir
+            </button>
+
+        </header>
+
+
+        <!-- SIN HOGAR -->
+        <main id="no-home" class="content hidden">
+
+            <div class="card">
+
+                <h2>🏠 Crea tu hogar</h2>
+
+                <p>
+                    Crea un espacio para gestionar
+                    las finanzas compartidas.
+                </p>
+
+                <input
+                    id="home-name"
+                    type="text"
+                    placeholder="Nombre del hogar"
+                >
+
+                <button id="create-home" class="primary-button">
+                    Crear hogar
+                </button>
+
+            </div>
+
+        </main>
+
+
+        <!-- HOME -->
+        <main id="home-content" class="content hidden">
+
+            <div class="home-title">
+                <small>Hogar</small>
+                <h1 id="home-name-display">Mi hogar</h1>
+            </div>
+
+
+            <!-- RESUMEN -->
+            <div class="dashboard-grid">
+
+                <div class="card balance-card">
+                    <small>Balance del mes</small>
+                    <strong id="monthly-balance">0,00 €</strong>
+                </div>
+
+                <div class="card">
+                    <small>Gastos comunes</small>
+                    <strong id="shared-expenses">0,00 €</strong>
+                </div>
+
+                <div class="card">
+                    <small>Ingresos comunes</small>
+                    <strong id="shared-income">0,00 €</strong>
+                </div>
+
+            </div>
+
+
+            <!-- MENÚ -->
+            <div class="menu-grid">
+
+                <button class="menu-button">
+                    💳
+                    <span>Movimientos</span>
+                </button>
+
+                <button class="menu-button">
+                    ⚖️
+                    <span>Reparto</span>
+                </button>
+
+                <button class="menu-button">
+                    🎯
+                    <span>Objetivos</span>
+                </button>
+
+                <button class="menu-button">
+                    📅
+                    <span>Recurrentes</span>
+                </button>
+
+                <button class="menu-button">
+                    👥
+                    <span>Miembros</span>
+                </button>
+
+                <button id="private-button" class="menu-button private">
+                    🔒
+                    <span>Mi cuenta</span>
+                </button>
+
+            </div>
+
+        </main>
+
+
+        <!-- CUENTA PRIVADA -->
+        <main id="private-content" class="content hidden">
+
+            <button id="back-home" class="back-button">
+                ← Volver
+            </button>
+
+            <h1>🔒 Mi cuenta</h1>
+
+            <div class="dashboard-grid">
+
+                <div class="card">
+                    <small>Mis ingresos</small>
+                    <strong id="private-income">0,00 €</strong>
+                </div>
+
+                <div class="card">
+                    <small>Mis gastos</small>
+                    <strong id="private-expenses">0,00 €</strong>
+                </div>
+
+                <div class="card">
+                    <small>Mis ahorros</small>
+                    <strong id="private-savings">0,00 €</strong>
+                </div>
+
+            </div>
+
+            <div class="card">
+
+                <h3>Mis finanzas privadas</h3>
+
+                <p>
+                    Esta información solamente
+                    será accesible para tu cuenta.
+                </p>
+
+            </div>
+
+        </main>
+
+    </section>
+
+
+    <script type="module" src="app.js"></script>
 
 </body>
 </html>
