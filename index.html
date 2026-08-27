@@ -1,156 +1,83 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#17202a">
+  <meta name="description" content="Gestión de finanzas del hogar">
 
-  <meta
-    name="theme-color"
-    content="#17202a">
-
-  <meta
-    name="description"
-    content="Gestión de finanzas del hogar">
-
-  <meta
-    name="mobile-web-app-capable"
-    content="yes">
-
-  <meta
-    name="apple-mobile-web-app-capable"
-    content="yes">
-
-  <meta
-    name="apple-mobile-web-app-status-bar-style"
-    content="default">
-
-  <meta
-    name="apple-mobile-web-app-title"
-    content="Finanzas Hogar">
-
-  <link
-    rel="manifest"
-    href="./manifest.json">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icons/icon-192.png">
 
   <title>Finanzas Hogar</title>
 
-  <link
-    rel="stylesheet"
-    href="./styles.css">
-
+  <link rel="stylesheet" href="./styles.css">
 </head>
-
 
 <body>
 
   <!-- =====================================================
-       LOADING
+       CARGANDO
   ====================================================== -->
 
-  <div
-    id="loadingScreen"
-    class="screen">
-
-    <div class="loading-card">
-
-      <div class="logo">
-        💶
-      </div>
-
-      <h1>Finanzas Hogar</h1>
-
-      <p>Cargando aplicación...</p>
-
-      <div class="loader"></div>
-
-    </div>
-
-  </div>
+  <section id="loadingScreen" class="screen loading-screen">
+    <div class="loader"></div>
+    <h2>Finanzas Hogar</h2>
+    <p>Cargando aplicación...</p>
+  </section>
 
 
   <!-- =====================================================
        LOGIN
   ====================================================== -->
 
-  <div
-    id="loginScreen"
-    class="screen hidden">
+  <section id="loginScreen" class="screen hidden">
 
     <div class="login-card">
 
-      <div class="login-logo">
-        💶
-      </div>
+      <div class="brand-icon">€</div>
 
       <h1>Finanzas Hogar</h1>
 
-      <p class="login-subtitle">
-        Gestiona los gastos, aportaciones
-        y ahorro de tu hogar.
+      <p>
+        Gestiona los gastos, aportaciones y ahorro
+        de tu hogar desde un único lugar.
       </p>
 
-      <button
-        id="googleLogin"
-        class="google-button">
-
-        <span class="google-icon">
-          G
-        </span>
-
-        <span>
-          Continuar con Google
-        </span>
-
+      <button id="googleLogin" class="google-button">
+        <span class="google-icon">G</span>
+        Continuar con Google
       </button>
 
-      <p class="login-info">
-        Tu cuenta se utiliza para identificar
-        tus datos y mantenerlos privados.
-      </p>
+      <small>
+        Tus datos estarán asociados a tu cuenta de Google.
+      </small>
 
     </div>
 
-  </div>
+  </section>
 
 
   <!-- =====================================================
-       APP
+       APLICACIÓN
   ====================================================== -->
 
-  <div
-    id="app"
-    class="app hidden">
-
+  <div id="app" class="app hidden">
 
     <!-- ===================================================
          SIDEBAR
     ==================================================== -->
 
-    <aside
-      id="sidebar"
-      class="sidebar">
+    <aside id="sidebar" class="sidebar">
 
-      <div class="sidebar-header">
+      <div class="sidebar-brand">
 
-        <div class="brand-icon">
-          💶
-        </div>
+        <div class="brand-mark">€</div>
 
         <div>
-
-          <strong>
-            Finanzas
-          </strong>
-
-          <span>
-            Hogar
-          </span>
-
+          <strong>Finanzas Hogar</strong>
+          <span>Gestión familiar</span>
         </div>
 
       </div>
@@ -161,50 +88,36 @@
         <button
           class="menu-item active"
           data-page="dashboard">
-
           <span>📊</span>
           <span>Dashboard</span>
-
         </button>
-
 
         <button
           class="menu-item"
           data-page="expenses">
-
           <span>💳</span>
           <span>Gastos</span>
-
         </button>
-
 
         <button
           class="menu-item"
           data-page="contributions">
-
           <span>💰</span>
           <span>Aportaciones</span>
-
         </button>
-
 
         <button
           class="menu-item"
           data-page="household">
-
           <span>🏠</span>
           <span>Mi hogar</span>
-
         </button>
-
 
         <button
           class="menu-item"
           data-page="settings">
-
           <span>⚙️</span>
           <span>Configuración</span>
-
         </button>
 
       </nav>
@@ -213,34 +126,17 @@
       <div class="sidebar-user">
 
         <div class="user-avatar">
-
-          <img
-            id="userPhoto"
-            src=""
-            alt=""
-            onerror="this.style.display='none'">
-
+          <img id="userPhoto" src="" alt="">
+          <span id="userInitial">U</span>
         </div>
 
-        <div class="user-data">
-
-          <strong id="userName">
-            Usuario
-          </strong>
-
-          <small id="userEmail">
-            —
-          </small>
-
+        <div class="user-details">
+          <strong id="userName">Usuario</strong>
+          <small id="userEmail"></small>
         </div>
 
-        <button
-          id="logout"
-          class="logout-button"
-          title="Cerrar sesión">
-
+        <button id="logout" class="logout-button" title="Cerrar sesión">
           ↪
-
         </button>
 
       </div>
@@ -254,49 +150,20 @@
 
     <main class="main-content">
 
-
-      <!-- HEADER -->
-
       <header class="topbar">
 
-        <div class="topbar-left">
+        <button id="mobileMenu" class="mobile-menu">
+          ☰
+        </button>
 
-          <button
-            id="mobileMenu"
-            class="mobile-menu"
-            aria-label="Abrir menú">
-
-            ☰
-
-          </button>
-
-          <div>
-
-            <h1 id="pageTitle">
-              Dashboard
-            </h1>
-
-            <p>
-              Control financiero del hogar
-            </p>
-
-          </div>
-
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <span id="currentPeriodLabel"></span>
         </div>
 
-
-        <div class="topbar-actions">
-
-          <button
-            id="themeButton"
-            class="icon-button"
-            title="Cambiar diseño">
-
-            🎨
-
-          </button>
-
-        </div>
+        <button id="themeButton" class="icon-button" title="Cambiar diseño">
+          🎨
+        </button>
 
       </header>
 
@@ -305,48 +172,21 @@
            DASHBOARD
       ================================================== -->
 
-      <section
-        id="dashboardPage"
-        class="page">
+      <section id="dashboardPage" class="page">
 
+        <div class="month-control">
 
-        <!-- PERIODO -->
-
-        <div class="period-selector">
-
-          <button
-            id="previousMonth"
-            class="period-button">
-
+          <button id="previousMonth" class="month-button">
             ‹
-
-          </button>
-
-          <div>
-
-            <strong>
-              <span id="currentPeriodLabel">
-                —
-              </span>
-            </strong>
-
-            <small>
-              Resumen mensual
-            </small>
-
-          </div>
-
-          <button
-            id="nextMonth"
-            class="period-button">
-
-            ›
-
           </button>
 
           <input
             type="month"
             id="monthSelector">
+
+          <button id="nextMonth" class="month-button">
+            ›
+          </button>
 
         </div>
 
@@ -355,244 +195,109 @@
 
         <div class="dashboard-grid">
 
+          <article class="stat-card contributions-card">
 
-          <!-- APORTACIONES -->
+            <div class="stat-icon">💰</div>
 
-          <article class="dashboard-card">
-
-            <div class="card-header">
-
-              <span>
-                Aportado al hogar
-              </span>
-
-              <span class="card-icon">
-                💰
-              </span>
-
+            <div>
+              <span>Aportaciones</span>
+              <strong id="dashboardContributions">0,00 €</strong>
             </div>
-
-            <strong
-              id="dashboardContributions"
-              class="card-value">
-
-              0,00 €
-
-            </strong>
-
-            <small>
-              Total aportado este mes
-            </small>
 
           </article>
 
 
-          <!-- COMUNES -->
+          <article class="stat-card common-card">
 
-          <article class="dashboard-card">
+            <div class="stat-icon">🏠</div>
 
-            <div class="card-header">
-
-              <span>
-                Gastos comunes
-              </span>
-
-              <span class="card-icon">
-                🏠
-              </span>
-
+            <div>
+              <span>Gastos comunes</span>
+              <strong id="dashboardCommon">0,00 €</strong>
             </div>
-
-            <strong
-              id="dashboardCommon"
-              class="card-value">
-
-              0,00 €
-
-            </strong>
-
-            <small>
-              Gastos compartidos
-            </small>
 
           </article>
 
 
-          <!-- INDIVIDUALES -->
+          <article class="stat-card individual-card">
 
-          <article class="dashboard-card">
+            <div class="stat-icon">👤</div>
 
-            <div class="card-header">
-
-              <span>
-                Gastos individuales
-              </span>
-
-              <span class="card-icon">
-                👤
-              </span>
-
+            <div>
+              <span>Gastos individuales</span>
+              <strong id="dashboardIndividual">0,00 €</strong>
             </div>
-
-            <strong
-              id="dashboardIndividual"
-              class="card-value">
-
-              0,00 €
-
-            </strong>
-
-            <small>
-              Gastos personales
-            </small>
 
           </article>
 
 
-          <!-- AHORRO -->
+          <article class="stat-card saving-card">
 
-          <article class="dashboard-card saving-card">
+            <div class="stat-icon">📈</div>
 
-            <div class="card-header">
-
-              <span>
-                Ahorro común
-              </span>
-
-              <span class="card-icon">
-                📈
-              </span>
-
+            <div>
+              <span>Ahorro común</span>
+              <strong id="dashboardSaving">0,00 €</strong>
             </div>
-
-            <strong
-              id="dashboardSaving"
-              class="card-value">
-
-              0,00 €
-
-            </strong>
-
-            <small>
-              Aportaciones menos gastos comunes
-            </small>
 
           </article>
 
         </div>
 
 
-        <!-- =================================================
-             DESGLOSE VISUAL
-        ================================================== -->
+        <!-- RESUMEN VISUAL -->
 
-        <div class="content-grid">
-
+        <div class="dashboard-columns">
 
           <article class="panel">
 
             <div class="panel-header">
-
               <div>
-
-                <h2>
-                  Distribución del mes
-                </h2>
-
-                <p>
-                  Situación financiera del hogar
-                </p>
-
+                <h2>Distribución del mes</h2>
+                <p>Situación financiera del hogar</p>
               </div>
-
             </div>
 
 
-            <div class="finance-bars">
+            <div class="financial-bars">
 
+              <div class="bar-item">
 
-              <div class="finance-row">
-
-                <div class="finance-label">
-
-                  <span>
-                    Gastos comunes
-                  </span>
-
-                  <strong
-                    id="commonBarValue">
-
-                    0,00 €
-
-                  </strong>
-
+                <div class="bar-label">
+                  <span>Gastos comunes</span>
+                  <strong id="commonBarValue">0,00 €</strong>
                 </div>
 
-                <div class="bar">
-
-                  <div
-                    id="commonBar"
-                    class="bar-fill common">
-                  </div>
-
+                <div class="bar-track">
+                  <div id="commonBar" class="bar common-bar"></div>
                 </div>
 
               </div>
 
 
-              <div class="finance-row">
+              <div class="bar-item">
 
-                <div class="finance-label">
-
-                  <span>
-                    Gastos individuales
-                  </span>
-
-                  <strong
-                    id="individualBarValue">
-
-                    0,00 €
-
-                  </strong>
-
+                <div class="bar-label">
+                  <span>Gastos individuales</span>
+                  <strong id="individualBarValue">0,00 €</strong>
                 </div>
 
-                <div class="bar">
-
-                  <div
-                    id="individualBar"
-                    class="bar-fill individual">
-                  </div>
-
+                <div class="bar-track">
+                  <div id="individualBar" class="bar individual-bar"></div>
                 </div>
 
               </div>
 
 
-              <div class="finance-row">
+              <div class="bar-item">
 
-                <div class="finance-label">
-
-                  <span>
-                    Ahorro común
-                  </span>
-
-                  <strong
-                    id="savingBarValue">
-
-                    0,00 €
-
-                  </strong>
-
+                <div class="bar-label">
+                  <span>Ahorro común</span>
+                  <strong id="savingBarValue">0,00 €</strong>
                 </div>
 
-                <div class="bar">
-
-                  <div
-                    id="savingBar"
-                    class="bar-fill saving">
-                  </div>
-
+                <div class="bar-track">
+                  <div id="savingBar" class="bar saving-bar"></div>
                 </div>
 
               </div>
@@ -609,36 +314,22 @@
             <div class="panel-header">
 
               <div>
-
-                <h2>
-                  Últimos movimientos
-                </h2>
-
-                <p>
-                  Actividad reciente
-                </p>
-
+                <h2>Últimos movimientos</h2>
+                <p>Actividad reciente</p>
               </div>
 
               <button
                 class="text-button"
                 data-go="expenses">
-
                 Ver gastos
-
               </button>
 
             </div>
 
-
-            <div
-              id="recentMovements"
-              class="movements">
-
+            <div id="recentMovements" class="movements">
               <div class="empty">
                 Todavía no hay movimientos.
               </div>
-
             </div>
 
           </article>
@@ -646,27 +337,17 @@
         </div>
 
 
-        <!-- =================================================
-             RESUMEN ANUAL
-        ================================================== -->
+        <!-- ACUMULADO ANUAL -->
 
         <article class="panel annual-panel">
 
           <div class="panel-header">
 
             <div>
-
-              <h2>
-                Acumulado anual
-              </h2>
-
+              <h2>Acumulado anual</h2>
               <p>
-                Resumen de
-                <span id="annualYear">
-                  —
-                </span>
+                Resumen de <span id="annualYear"></span>
               </p>
-
             </div>
 
           </div>
@@ -674,74 +355,29 @@
 
           <div class="annual-grid">
 
-
             <div class="annual-item">
-
-              <span>
-                Aportaciones
-              </span>
-
-              <strong
-                id="annualContributions">
-
-                0,00 €
-
-              </strong>
-
+              <span>Aportaciones</span>
+              <strong id="annualContributions">0,00 €</strong>
             </div>
 
-
             <div class="annual-item">
-
-              <span>
-                Gastos comunes
-              </span>
-
-              <strong
-                id="annualCommon">
-
-                0,00 €
-
-              </strong>
-
+              <span>Gastos comunes</span>
+              <strong id="annualCommon">0,00 €</strong>
             </div>
 
-
             <div class="annual-item">
-
-              <span>
-                Gastos individuales
-              </span>
-
-              <strong
-                id="annualIndividual">
-
-                0,00 €
-
-              </strong>
-
+              <span>Gastos individuales</span>
+              <strong id="annualIndividual">0,00 €</strong>
             </div>
 
-
-            <div class="annual-item">
-
-              <span>
-                Ahorro común
-              </span>
-
-              <strong
-                id="annualSaving">
-
-                0,00 €
-
-              </strong>
-
+            <div class="annual-item highlight">
+              <span>Ahorro común</span>
+              <strong id="annualSaving">0,00 €</strong>
             </div>
 
           </div>
 
         </article>
-
 
       </section>
 
@@ -750,32 +386,17 @@
            GASTOS
       ================================================== -->
 
-      <section
-        id="expensesPage"
-        class="page hidden">
-
+      <section id="expensesPage" class="page hidden">
 
         <div class="page-actions">
 
           <div>
-
-            <h2>
-              Gastos
-            </h2>
-
-            <p>
-              Gestiona los gastos comunes
-              e individuales.
-            </p>
-
+            <h2>Gastos</h2>
+            <p>Controla todos los gastos del hogar.</p>
           </div>
 
-          <button
-            id="newExpense"
-            class="primary-button">
-
+          <button id="newExpense" class="primary-button">
             + Nuevo gasto
-
           </button>
 
         </div>
@@ -784,25 +405,14 @@
         <div class="filters">
 
           <input
-            id="expenseSearch"
             type="search"
+            id="expenseSearch"
             placeholder="Buscar gasto...">
 
-
           <select id="expenseFilter">
-
-            <option value="all">
-              Todos los gastos
-            </option>
-
-            <option value="common">
-              Gastos comunes
-            </option>
-
-            <option value="individual">
-              Gastos individuales
-            </option>
-
+            <option value="all">Todos los gastos</option>
+            <option value="common">Gastos comunes</option>
+            <option value="individual">Gastos individuales</option>
           </select>
 
         </div>
@@ -810,47 +420,25 @@
 
         <article class="panel table-panel">
 
-          <div class="table-wrapper">
+          <div class="table-container">
 
             <table>
 
               <thead>
 
                 <tr>
-
                   <th>Fecha</th>
-
                   <th>Concepto</th>
-
                   <th>Categoría</th>
-
                   <th>Tipo</th>
-
-                  <th>Persona</th>
-
+                  <th>Miembro</th>
                   <th>Importe</th>
-
-                  <th>Acciones</th>
-
+                  <th></th>
                 </tr>
 
               </thead>
 
-              <tbody
-                id="expensesTable">
-
-                <tr>
-
-                  <td
-                    colspan="7"
-                    class="empty">
-
-                    No hay gastos registrados.
-
-                  </td>
-
-                </tr>
-
+              <tbody id="expensesTable">
               </tbody>
 
             </table>
@@ -866,32 +454,17 @@
            APORTACIONES
       ================================================== -->
 
-      <section
-        id="contributionsPage"
-        class="page hidden">
-
+      <section id="contributionsPage" class="page hidden">
 
         <div class="page-actions">
 
           <div>
-
-            <h2>
-              Aportaciones
-            </h2>
-
-            <p>
-              Registra cuánto aporta cada
-              miembro al hogar.
-            </p>
-
+            <h2>Aportaciones</h2>
+            <p>Dinero aportado al fondo común.</p>
           </div>
 
-          <button
-            id="newContribution"
-            class="primary-button">
-
+          <button id="newContribution" class="primary-button">
             + Nueva aportación
-
           </button>
 
         </div>
@@ -899,43 +472,21 @@
 
         <article class="panel table-panel">
 
-          <div class="table-wrapper">
+          <div class="table-container">
 
             <table>
 
               <thead>
-
                 <tr>
-
                   <th>Fecha</th>
-
-                  <th>Persona</th>
-
+                  <th>Miembro</th>
                   <th>Concepto</th>
-
                   <th>Importe</th>
-
-                  <th>Acciones</th>
-
+                  <th></th>
                 </tr>
-
               </thead>
 
-              <tbody
-                id="contributionsTable">
-
-                <tr>
-
-                  <td
-                    colspan="5"
-                    class="empty">
-
-                    No hay aportaciones registradas.
-
-                  </td>
-
-                </tr>
-
+              <tbody id="contributionsTable">
               </tbody>
 
             </table>
@@ -951,144 +502,79 @@
            MI HOGAR
       ================================================== -->
 
-      <section
-        id="householdPage"
-        class="page hidden">
-
+      <section id="householdPage" class="page hidden">
 
         <div class="page-actions">
 
           <div>
-
-            <h2>
-              Mi hogar
-            </h2>
-
-            <p>
-              Personas que comparten este
-              espacio financiero.
-            </p>
-
+            <h2>Mi hogar</h2>
+            <p>Personas que comparten este hogar financiero.</p>
           </div>
 
         </div>
 
 
-        <div class="content-grid">
-
-
-          <!-- MIEMBROS -->
+        <div class="dashboard-columns">
 
           <article class="panel">
 
             <div class="panel-header">
-
               <div>
-
-                <h2>
-                  Miembros
-                </h2>
-
-                <p>
-                  Usuarios del hogar
-                </p>
-
+                <h2>Miembros</h2>
+                <p>Usuarios con acceso al hogar</p>
               </div>
-
             </div>
 
-
-            <div
-              id="membersList"
-              class="members-list">
-
-              <p class="empty">
-                Cargando miembros...
-              </p>
-
+            <div id="membersList" class="members-list">
             </div>
 
           </article>
 
 
-          <!-- INVITACIÓN -->
-
-          <article class="panel">
+          <article class="panel invite-panel">
 
             <div class="panel-header">
 
               <div>
-
-                <h2>
-                  Invitar al hogar
-                </h2>
-
+                <h2>Invitar a otra persona</h2>
                 <p>
-                  Comparte este código con
-                  otra persona.
+                  Comparte este código para unirse al hogar.
                 </p>
-
               </div>
 
             </div>
 
 
-            <div class="invite-box">
+            <div class="invite-code" id="inviteCode">
+              ------
+            </div>
 
-              <span>
-                Código de invitación
-              </span>
+            <button id="generateInvite" class="secondary-button">
+              Generar nuevo código
+            </button>
 
-              <strong
-                id="inviteCode">
 
-                ------
+            <hr>
 
-              </strong>
 
-              <button
-                id="generateInvite"
-                class="secondary-button">
+            <h3>Unirse a otro hogar</h3>
 
-                Generar nuevo código
+            <div class="join-form">
 
+              <input
+                type="text"
+                id="joinCode"
+                maxlength="6"
+                placeholder="Código de 6 caracteres"
+                autocomplete="off">
+
+              <button id="joinHousehold" class="primary-button">
+                Unirme
               </button>
 
             </div>
 
-
-            <div class="join-box">
-
-              <label
-                for="joinCode">
-
-                ¿Tienes un código?
-
-              </label>
-
-              <div class="join-row">
-
-                <input
-                  id="joinCode"
-                  type="text"
-                  maxlength="6"
-                  placeholder="ABC123"
-                  autocomplete="off">
-
-                <button
-                  id="joinHousehold"
-                  class="primary-button">
-
-                  Unirme
-
-                </button>
-
-              </div>
-
-            </div>
-
           </article>
-
 
         </div>
 
@@ -1099,80 +585,85 @@
            CONFIGURACIÓN
       ================================================== -->
 
-      <section
-        id="settingsPage"
-        class="page hidden">
-
+      <section id="settingsPage" class="page hidden">
 
         <div class="page-actions">
 
           <div>
-
-            <h2>
-              Configuración
-            </h2>
-
-            <p>
-              Personaliza tu experiencia.
-            </p>
-
+            <h2>Configuración</h2>
+            <p>Personaliza tu experiencia.</p>
           </div>
 
         </div>
 
 
-        <div class="content-grid">
-
-
-          <!-- CUENTA -->
+        <div class="settings-grid">
 
           <article class="panel">
 
-            <div class="panel-header">
+            <h2>Diseño</h2>
 
-              <div>
+            <p>
+              Elige el estilo visual de la aplicación.
+            </p>
 
-                <h2>
-                  Cuenta
-                </h2>
 
-                <p>
-                  Cuenta de Google conectada
-                </p>
+            <div class="theme-options">
 
-              </div>
+              <button
+                class="theme-option"
+                data-theme="classic">
+                <span>◼</span>
+                <strong>Clásico</strong>
+                <small>Tradicional y profesional</small>
+              </button>
+
+
+              <button
+                class="theme-option"
+                data-theme="modern">
+                <span>◆</span>
+                <strong>Moderno</strong>
+                <small>Limpio y actual</small>
+              </button>
+
+
+              <button
+                class="theme-option"
+                data-theme="clean">
+                <span>○</span>
+                <strong>Minimalista</strong>
+                <small>Simple y despejado</small>
+              </button>
+
+
+              <button
+                class="theme-option"
+                data-theme="dark">
+                <span>●</span>
+                <strong>Oscuro</strong>
+                <small>Ideal para baja luz</small>
+              </button>
 
             </div>
 
+          </article>
+
+
+          <article class="panel">
+
+            <h2>Cuenta</h2>
 
             <div class="account-info">
 
-              <div class="settings-avatar">
-
-                <img
-                  id="settingsPhoto"
-                  src=""
-                  alt=""
-                  onerror="this.style.display='none'">
-
+              <div class="account-avatar">
+                <img id="settingsPhoto" src="" alt="">
+                <span id="settingsInitial">U</span>
               </div>
 
               <div>
-
-                <strong
-                  id="settingsName">
-
-                  Usuario
-
-                </strong>
-
-                <span
-                  id="settingsEmail">
-
-                  —
-
-                </span>
-
+                <strong id="settingsName">Usuario</strong>
+                <p id="settingsEmail"></p>
               </div>
 
             </div>
@@ -1181,119 +672,14 @@
             <button
               id="settingsLogout"
               class="danger-button">
-
               Cerrar sesión
-
             </button>
 
           </article>
 
-
-          <!-- TEMA -->
-
-          <article class="panel">
-
-            <div class="panel-header">
-
-              <div>
-
-                <h2>
-                  Diseño
-                </h2>
-
-                <p>
-                  Elige el aspecto de la aplicación.
-                </p>
-
-              </div>
-
-            </div>
-
-
-            <div class="theme-options">
-
-
-              <button
-                class="theme-option"
-                data-theme="classic">
-
-                <span class="theme-preview classic-preview">
-                </span>
-
-                <strong>
-                  Clásico
-                </strong>
-
-                <small>
-                  Tradicional y sobrio
-                </small>
-
-              </button>
-
-
-              <button
-                class="theme-option"
-                data-theme="modern">
-
-                <span class="theme-preview modern-preview">
-                </span>
-
-                <strong>
-                  Moderno
-                </strong>
-
-                <small>
-                  Actual y dinámico
-                </small>
-
-              </button>
-
-
-              <button
-                class="theme-option"
-                data-theme="clean">
-
-                <span class="theme-preview clean-preview">
-                </span>
-
-                <strong>
-                  Limpio
-                </strong>
-
-                <small>
-                  Minimalista
-                </small>
-
-              </button>
-
-
-              <button
-                class="theme-option"
-                data-theme="dark">
-
-                <span class="theme-preview dark-preview">
-                </span>
-
-                <strong>
-                  Oscuro
-                </strong>
-
-                <small>
-                  Cómodo por la noche
-                </small>
-
-              </button>
-
-
-            </div>
-
-          </article>
-
-
         </div>
 
       </section>
-
 
     </main>
 
@@ -1306,223 +692,127 @@
 
   <dialog id="expenseModal">
 
-    <div class="modal-card">
+    <form id="expenseForm" class="modal-card">
 
       <div class="modal-header">
 
         <div>
-
-          <h2 id="expenseModalTitle">
-            Nuevo gasto
-          </h2>
-
-          <p>
-            Registra el movimiento.
-          </p>
-
+          <h2 id="expenseModalTitle">Nuevo gasto</h2>
+          <p>Registra un gasto del hogar.</p>
         </div>
 
         <button
-          class="close-modal"
-          type="button">
-
+          type="button"
+          class="close-modal">
           ×
-
         </button>
 
       </div>
 
 
-      <form id="expenseForm">
+      <input
+        type="hidden"
+        id="expenseId">
 
 
+      <label>
+        Concepto
         <input
-          id="expenseId"
-          type="hidden">
+          type="text"
+          id="expenseConcept"
+          required
+          maxlength="100"
+          placeholder="Ej. Compra supermercado">
+      </label>
 
 
-        <div class="form-group">
+      <div class="form-row">
 
-          <label
-            for="expenseConcept">
-
-            Concepto
-
-          </label>
-
+        <label>
+          Importe
           <input
-            id="expenseConcept"
-            type="text"
-            placeholder="Ej. Supermercado"
+            type="number"
+            id="expenseAmount"
+            required
+            min="0.01"
+            step="0.01"
+            placeholder="0,00">
+        </label>
+
+
+        <label>
+          Fecha
+          <input
+            type="date"
+            id="expenseDate"
             required>
+        </label>
 
-        </div>
-
-
-        <div class="form-grid">
+      </div>
 
 
-          <div class="form-group">
+      <div class="form-row">
 
-            <label
-              for="expenseAmount">
+        <label>
+          Tipo
+          <select id="expenseType">
 
-              Importe
+            <option value="common">
+              Gasto común
+            </option>
 
-            </label>
+            <option value="individual">
+              Gasto individual
+            </option>
 
-            <input
-              id="expenseAmount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              placeholder="0,00"
-              required>
-
-          </div>
+          </select>
+        </label>
 
 
-          <div class="form-group">
-
-            <label
-              for="expenseDate">
-
-              Fecha
-
-            </label>
-
-            <input
-              id="expenseDate"
-              type="date"
-              required>
-
-          </div>
-
-
-        </div>
-
-
-        <div class="form-grid">
-
-
-          <div class="form-group">
-
-            <label
-              for="expenseType">
-
-              Tipo
-
-            </label>
-
-            <select id="expenseType">
-
-              <option value="common">
-                Gasto común
-              </option>
-
-              <option value="individual">
-                Gasto individual
-              </option>
-
-            </select>
-
-          </div>
-
-
-          <div class="form-group">
-
-            <label
-              for="expenseCategory">
-
-              Categoría
-
-            </label>
-
-            <select id="expenseCategory">
-
-              <option value="Alimentación">
-                Alimentación
-              </option>
-
-              <option value="Vivienda">
-                Vivienda
-              </option>
-
-              <option value="Transporte">
-                Transporte
-              </option>
-
-              <option value="Suministros">
-                Suministros
-              </option>
-
-              <option value="Ocio">
-                Ocio
-              </option>
-
-              <option value="Salud">
-                Salud
-              </option>
-
-              <option value="Compras">
-                Compras
-              </option>
-
-              <option value="Educación">
-                Educación
-              </option>
-
-              <option value="Otros">
-                Otros
-              </option>
-
-            </select>
-
-          </div>
-
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label
-            for="expenseMember">
-
-            Persona
-
-          </label>
-
+        <label>
+          Miembro
           <select id="expenseMember">
           </select>
+        </label>
 
-        </div>
-
-
-        <div class="modal-actions">
-
-          <button
-            type="button"
-            class="secondary-button close-modal">
-
-            Cancelar
-
-          </button>
-
-          <button
-            type="submit"
-            class="primary-button">
-
-            Guardar gasto
-
-          </button>
-
-        </div>
+      </div>
 
 
-      </form>
+      <label>
+        Categoría
+        <select id="expenseCategory">
 
-    </div>
+          <option>Alimentación</option>
+          <option>Vivienda</option>
+          <option>Transporte</option>
+          <option>Ocio</option>
+          <option>Salud</option>
+          <option>Educación</option>
+          <option>Compras</option>
+          <option>Servicios</option>
+          <option>Otros</option>
+
+        </select>
+      </label>
+
+
+      <div class="modal-actions">
+
+        <button
+          type="button"
+          class="secondary-button close-modal">
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          class="primary-button">
+          Guardar gasto
+        </button>
+
+      </div>
+
+    </form>
 
   </dialog>
 
@@ -1533,136 +823,83 @@
 
   <dialog id="contributionModal">
 
-    <div class="modal-card">
+    <form id="contributionForm" class="modal-card">
 
       <div class="modal-header">
 
         <div>
-
-          <h2>
-            Nueva aportación
-          </h2>
-
-          <p>
-            Dinero aportado al hogar.
-          </p>
-
+          <h2>Nueva aportación</h2>
+          <p>Registra dinero aportado al hogar.</p>
         </div>
 
         <button
-          class="close-modal"
-          type="button">
-
+          type="button"
+          class="close-modal">
           ×
-
         </button>
 
       </div>
 
 
-      <form id="contributionForm">
+      <label>
+        Miembro
+        <select id="contributionMember">
+        </select>
+      </label>
 
 
-        <div class="form-group">
+      <div class="form-row">
 
-          <label
-            for="contributionMember">
-
-            Persona
-
-          </label>
-
-          <select
-            id="contributionMember">
-          </select>
-
-        </div>
-
-
-        <div class="form-grid">
-
-
-          <div class="form-group">
-
-            <label
-              for="contributionAmount">
-
-              Importe
-
-            </label>
-
-            <input
-              id="contributionAmount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              placeholder="0,00"
-              required>
-
-          </div>
-
-
-          <div class="form-group">
-
-            <label
-              for="contributionDate">
-
-              Fecha
-
-            </label>
-
-            <input
-              id="contributionDate"
-              type="date"
-              required>
-
-          </div>
-
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label
-            for="contributionConcept">
-
-            Concepto
-
-          </label>
-
+        <label>
+          Importe
           <input
-            id="contributionConcept"
-            type="text"
-            placeholder="Aportación mensual">
-
-        </div>
-
-
-        <div class="modal-actions">
-
-          <button
-            type="button"
-            class="secondary-button close-modal">
-
-            Cancelar
-
-          </button>
-
-          <button
-            type="submit"
-            class="primary-button">
-
-            Guardar aportación
-
-          </button>
-
-        </div>
+            type="number"
+            id="contributionAmount"
+            required
+            min="0.01"
+            step="0.01"
+            placeholder="0,00">
+        </label>
 
 
-      </form>
+        <label>
+          Fecha
+          <input
+            type="date"
+            id="contributionDate"
+            required>
+        </label>
 
-    </div>
+      </div>
+
+
+      <label>
+        Concepto
+        <input
+          type="text"
+          id="contributionConcept"
+          maxlength="100"
+          placeholder="Aportación mensual">
+      </label>
+
+
+      <div class="modal-actions">
+
+        <button
+          type="button"
+          class="secondary-button close-modal">
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          class="primary-button">
+          Guardar aportación
+        </button>
+
+      </div>
+
+    </form>
 
   </dialog>
 
@@ -1671,22 +908,14 @@
        TOAST
   ====================================================== -->
 
-  <div
-    id="toast"
-    class="toast">
-  </div>
+  <div id="toast" class="toast"></div>
 
 
   <!-- =====================================================
        JAVASCRIPT
   ====================================================== -->
 
-  <script
-    type="module"
-    src="./app.js">
-  </script>
-
+  <script type="module" src="./app.js"></script>
 
 </body>
-
 </html>
