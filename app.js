@@ -17,187 +17,257 @@ import {
     setDoc,
     collection,
     addDoc,
-    serverTimestamp
+    serverTimestamp,
+    query,
+    orderBy,
+    onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 
-/* =========================================
+/* ==========================================
    FIREBASE
-   ========================================= */
+========================================== */
 
 const firebaseConfig = {
-    apiKey: "AIzaSyA1oKOXWYqauiGL4N8Oh3mG3JMP5ZFCxGw",
-    authDomain: "finanzas-hogar-803fd.firebaseapp.com",
-    projectId: "finanzas-hogar-803fd",
-    storageBucket: "finanzas-hogar-803fd.firebasestorage.app",
-    messagingSenderId: "461089916272",
-    appId: "1:461089916272:web:c0755eddab52ea08673bb5"
+
+    apiKey:
+        "AIzaSyA1oKOXWYqauiGL4N8Oh3mG3JMP5ZFCxGw",
+
+    authDomain:
+        "finanzas-hogar-803fd.firebaseapp.com",
+
+    projectId:
+        "finanzas-hogar-803fd",
+
+    storageBucket:
+        "finanzas-hogar-803fd.firebasestorage.app",
+
+    messagingSenderId:
+        "461089916272",
+
+    appId:
+        "1:461089916272:web:c0755eddab52ea08673bb5"
+
 };
 
 
-const firebaseApp = initializeApp(firebaseConfig);
+const app =
+    initializeApp(firebaseConfig);
 
-const auth = getAuth(firebaseApp);
+const auth =
+    getAuth(app);
 
-const db = getFirestore(firebaseApp);
+const db =
+    getFirestore(app);
 
-const googleProvider = new GoogleAuthProvider();
+const googleProvider =
+    new GoogleAuthProvider();
 
 
-/* =========================================
-   ELEMENTOS DE LA INTERFAZ
-   ========================================= */
+/* ==========================================
+   ESTADO
+========================================== */
+
+let currentUser = null;
+
+let currentHomeId = null;
+
+let movementType = "expense";
+
+
+/* ==========================================
+   ELEMENTOS
+========================================== */
 
 const loginScreen =
-    document.getElementById("login-screen");
+    document.getElementById(
+        "login-screen"
+    );
 
 const appScreen =
-    document.getElementById("app-screen");
+    document.getElementById(
+        "app-screen"
+    );
 
 const googleLogin =
-    document.getElementById("google-login");
+    document.getElementById(
+        "google-login"
+    );
 
 const logoutButton =
-    document.getElementById("logout-button");
+    document.getElementById(
+        "logout-button"
+    );
 
 const loginError =
-    document.getElementById("login-error");
+    document.getElementById(
+        "login-error"
+    );
 
 const userName =
-    document.getElementById("user-name");
+    document.getElementById(
+        "user-name"
+    );
 
 const noHome =
-    document.getElementById("no-home");
+    document.getElementById(
+        "no-home"
+    );
 
 const homeContent =
-    document.getElementById("home-content");
-
-const privateContent =
-    document.getElementById("private-content");
-
-const createHome =
-    document.getElementById("create-home");
+    document.getElementById(
+        "home-content"
+    );
 
 const homeNameInput =
-    document.getElementById("home-name");
+    document.getElementById(
+        "home-name"
+    );
 
 const homeNameDisplay =
-    document.getElementById("home-name-display");
+    document.getElementById(
+        "home-name-display"
+    );
 
-const privateButton =
-    document.getElementById("private-button");
+const createHome =
+    document.getElementById(
+        "create-home"
+    );
 
-const backHome =
-    document.getElementById("back-home");
+const bottomNav =
+    document.getElementById(
+        "bottom-nav"
+    );
 
 
-/* =========================================
-   LOGIN CON GOOGLE
-   ========================================= */
+/* ==========================================
+   LOGIN
+========================================== */
 
-googleLogin.addEventListener("click", async () => {
+googleLogin.addEventListener(
+    "click",
+    async () => {
 
-    loginError.textContent = "";
+        loginError.textContent = "";
 
-    try {
+        try {
 
-        await signInWithPopup(
-            auth,
-            googleProvider
-        );
+            await signInWithPopup(
+                auth,
+                googleProvider
+            );
 
-    } catch (error) {
+        } catch (error) {
 
-        console.error(
-            "Error de inicio de sesión:",
-            error
-        );
+            console.error(error);
 
-        loginError.textContent =
-            "No se ha podido iniciar sesión con Google.";
+            loginError.textContent =
+                "No se ha podido iniciar sesión.";
+
+        }
 
     }
+);
 
-});
 
+/* ==========================================
+   LOGOUT
+========================================== */
 
-/* =========================================
-   CERRAR SESIÓN
-   ========================================= */
-
-logoutButton.addEventListener("click", async () => {
-
-    try {
+logoutButton.addEventListener(
+    "click",
+    async () => {
 
         await signOut(auth);
 
-    } catch (error) {
+    }
+);
 
-        console.error(
-            "Error cerrando sesión:",
-            error
+
+/* ==========================================
+   AUTENTICACIÓN
+========================================== */
+
+onAuthStateChanged(
+    auth,
+    async user => {
+
+        if (!user) {
+
+            currentUser = null;
+
+            currentHomeId = null;
+
+            loginScreen.classList.remove(
+                "hidden"
+            );
+
+            appScreen.classList.add(
+                "hidden"
+            );
+
+            bottomNav.classList.add(
+                "hidden"
+            );
+
+            return;
+        }
+
+
+        currentUser = user;
+
+
+        loginScreen.classList.add(
+            "hidden"
         );
 
+        appScreen.classList.remove(
+            "hidden"
+        );
+
+        bottomNav.classList.remove(
+            "hidden"
+        );
+
+
+        userName.textContent =
+            user.displayName ||
+            "Usuario";
+
+
+        await loadUser(user);
+
     }
-
-});
-
-
-/* =========================================
-   CONTROL DE AUTENTICACIÓN
-   ========================================= */
-
-onAuthStateChanged(auth, async (user) => {
-
-    if (!user) {
-
-        loginScreen.classList.remove("hidden");
-
-        appScreen.classList.add("hidden");
-
-        return;
-    }
+);
 
 
-    loginScreen.classList.add("hidden");
-
-    appScreen.classList.remove("hidden");
-
-
-    userName.textContent =
-        user.displayName || "Usuario";
-
-
-    await loadUser(user);
-
-});
-
-
-/* =========================================
-   CARGAR USUARIO
-   ========================================= */
+/* ==========================================
+   USUARIO
+========================================== */
 
 async function loadUser(user) {
 
     try {
 
         const userRef =
-            doc(db, "users", user.uid);
+            doc(
+                db,
+                "users",
+                user.uid
+            );
 
-        const userSnap =
+        const snapshot =
             await getDoc(userRef);
 
 
-        /*
-         * PRIMER ACCESO
-         */
-
-        if (!userSnap.exists()) {
+        if (!snapshot.exists()) {
 
             await setDoc(
                 userRef,
                 {
-                    uid: user.uid,
+
+                    uid:
+                        user.uid,
 
                     name:
                         user.displayName ||
@@ -211,10 +281,12 @@ async function loadUser(user) {
                         user.photoURL ||
                         "",
 
-                    homeId: null,
+                    homeId:
+                        null,
 
                     createdAt:
                         serverTimestamp()
+
                 }
             );
 
@@ -225,15 +297,11 @@ async function loadUser(user) {
         }
 
 
-        /*
-         * USUARIO EXISTENTE
-         */
-
-        const userData =
-            userSnap.data();
+        const data =
+            snapshot.data();
 
 
-        if (!userData.homeId) {
+        if (!data.homeId) {
 
             showNoHome();
 
@@ -241,223 +309,276 @@ async function loadUser(user) {
         }
 
 
-        await loadHome(
-            userData.homeId
-        );
+        currentHomeId =
+            data.homeId;
 
+
+        await loadHome(
+            currentHomeId
+        );
 
     } catch (error) {
 
-        console.error(
-            "Error cargando usuario:",
-            error
-        );
+        console.error(error);
 
         loginError.textContent =
-            "No se han podido cargar tus datos.";
+            "Error cargando los datos.";
 
     }
 
 }
 
 
-/* =========================================
-   MOSTRAR CREACIÓN DE HOGAR
-   ========================================= */
+/* ==========================================
+   SIN HOGAR
+========================================== */
 
 function showNoHome() {
 
-    noHome.classList.remove("hidden");
+    noHome.classList.remove(
+        "hidden"
+    );
 
-    homeContent.classList.add("hidden");
-
-    privateContent.classList.add("hidden");
+    homeContent.classList.add(
+        "hidden"
+    );
 
 }
 
 
-/* =========================================
+/* ==========================================
    CREAR HOGAR
-   ========================================= */
+========================================== */
 
-createHome.addEventListener("click", async () => {
+createHome.addEventListener(
+    "click",
+    async () => {
 
-    const user =
-        auth.currentUser;
-
-    if (!user) return;
-
-
-    const name =
-        homeNameInput.value.trim();
+        if (!currentUser) return;
 
 
-    if (!name) {
+        const name =
+            homeNameInput.value.trim();
 
-        alert(
-            "Introduce un nombre para el hogar."
+
+        if (!name) {
+
+            alert(
+                "Introduce un nombre."
+            );
+
+            return;
+        }
+
+
+        try {
+
+            const homeRef =
+                await addDoc(
+                    collection(
+                        db,
+                        "homes"
+                    ),
+                    {
+
+                        name,
+
+                        ownerId:
+                            currentUser.uid,
+
+                        createdAt:
+                            serverTimestamp()
+
+                    }
+                );
+
+
+            await setDoc(
+
+                doc(
+                    db,
+                    "homes",
+                    homeRef.id,
+                    "members",
+                    currentUser.uid
+                ),
+
+                {
+
+                    uid:
+                        currentUser.uid,
+
+                    name:
+                        currentUser.displayName ||
+                        "Usuario",
+
+                    email:
+                        currentUser.email ||
+                        "",
+
+                    role:
+                        "owner",
+
+                    joinedAt:
+                        serverTimestamp()
+
+                }
+
+            );
+
+
+            await setDoc(
+
+                doc(
+                    db,
+                    "users",
+                    currentUser.uid
+                ),
+
+                {
+
+                    homeId:
+                        homeRef.id
+
+                },
+
+                {
+
+                    merge:
+                        true
+
+                }
+
+            );
+
+
+            currentHomeId =
+                homeRef.id;
+
+
+            await loadHome(
+                currentHomeId
+            );
+
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert(
+                "No se ha podido crear el hogar."
+            );
+
+        }
+
+    }
+);
+
+
+/* ==========================================
+   CARGAR HOGAR
+========================================== */
+
+async function loadHome(homeId) {
+
+    const homeRef =
+        doc(
+            db,
+            "homes",
+            homeId
+        );
+
+
+    const snapshot =
+        await getDoc(homeRef);
+
+
+    if (!snapshot.exists()) {
+
+        showNoHome();
+
+        return;
+    }
+
+
+    const home =
+        snapshot.data();
+
+
+    homeNameDisplay.textContent =
+        home.name;
+
+
+    noHome.classList.add(
+        "hidden"
+    );
+
+    homeContent.classList.remove(
+        "hidden"
+    );
+
+
+    loadMovements(homeId);
+
+    loadMembers(homeId);
+
+}
+
+
+/* ==========================================
+   NAVEGACIÓN
+========================================== */
+
+function showSection(
+    section
+) {
+
+    const sections =
+        document.querySelectorAll(
+            ".app-section"
+        );
+
+
+    sections.forEach(
+        element => {
+
+            element.classList.add(
+                "hidden"
+            );
+
+        }
+    );
+
+
+    homeContent.classList.add(
+        "hidden"
+    );
+
+    noHome.classList.add(
+        "hidden"
+    );
+
+
+    if (section === "home") {
+
+        homeContent.classList.remove(
+            "hidden"
         );
 
         return;
     }
 
 
-    try {
-
-        /*
-         * CREAR HOGAR
-         */
-
-        const homeRef =
-            await addDoc(
-                collection(db, "homes"),
-                {
-
-                    name: name,
-
-                    ownerId: user.uid,
-
-                    createdAt:
-                        serverTimestamp()
-
-                }
-            );
-
-
-        /*
-         * AÑADIR PROPIETARIO
-         * COMO MIEMBRO
-         */
-
-        await setDoc(
-
-            doc(
-                db,
-                "homes",
-                homeRef.id,
-                "members",
-                user.uid
-            ),
-
-            {
-
-                uid: user.uid,
-
-                name:
-                    user.displayName ||
-                    "Usuario",
-
-                email:
-                    user.email ||
-                    "",
-
-                role: "owner",
-
-                joinedAt:
-                    serverTimestamp()
-
-            }
-
+    const target =
+        document.getElementById(
+            `${section}-content`
         );
 
 
-        /*
-         * GUARDAR HOME ID
-         * EN EL USUARIO
-         */
+    if (target) {
 
-        await setDoc(
-
-            doc(
-                db,
-                "users",
-                user.uid
-            ),
-
-            {
-
-                homeId:
-                    homeRef.id
-
-            },
-
-            {
-
-                merge: true
-
-            }
-
-        );
-
-
-        await loadHome(
-            homeRef.id
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "Error creando hogar:",
-            error
-        );
-
-        alert(
-            "No se ha podido crear el hogar."
-        );
-
-    }
-
-});
-
-
-/* =========================================
-   CARGAR HOGAR
-   ========================================= */
-
-async function loadHome(homeId) {
-
-    try {
-
-        const homeRef =
-            doc(
-                db,
-                "homes",
-                homeId
-            );
-
-        const homeSnap =
-            await getDoc(homeRef);
-
-
-        if (!homeSnap.exists()) {
-
-            showNoHome();
-
-            return;
-        }
-
-
-        const home =
-            homeSnap.data();
-
-
-        homeNameDisplay.textContent =
-            home.name;
-
-
-        noHome.classList.add("hidden");
-
-        homeContent.classList.remove("hidden");
-
-        privateContent.classList.add("hidden");
-
-
-    } catch (error) {
-
-        console.error(
-            "Error cargando hogar:",
-            error
+        target.classList.remove(
+            "hidden"
         );
 
     }
@@ -465,60 +586,689 @@ async function loadHome(homeId) {
 }
 
 
-/* =========================================
-   CUENTA PRIVADA
-   ========================================= */
+/* Todos los botones con data-section */
 
-privateButton.addEventListener(
+document.addEventListener(
     "click",
-    () => {
+    event => {
 
-        homeContent.classList.add("hidden");
+        const button =
+            event.target.closest(
+                "[data-section]"
+            );
 
-        privateContent.classList.remove(
-            "hidden"
+
+        if (!button) return;
+
+
+        showSection(
+            button.dataset.section
         );
 
     }
 );
 
 
-backHome.addEventListener(
+/* ==========================================
+   TIPO MOVIMIENTO
+========================================== */
+
+const expenseType =
+    document.getElementById(
+        "expense-type"
+    );
+
+const incomeType =
+    document.getElementById(
+        "income-type"
+    );
+
+
+expenseType.addEventListener(
     "click",
     () => {
 
-        privateContent.classList.add(
-            "hidden"
+        movementType =
+            "expense";
+
+        expenseType.classList.add(
+            "active"
         );
 
-        homeContent.classList.remove(
-            "hidden"
+        incomeType.classList.remove(
+            "active"
         );
 
     }
 );
 
 
-/* =========================================
+incomeType.addEventListener(
+    "click",
+    () => {
+
+        movementType =
+            "income";
+
+        incomeType.classList.add(
+            "active"
+        );
+
+        expenseType.classList.remove(
+            "active"
+        );
+
+    }
+);
+
+
+/* ==========================================
+   GUARDAR MOVIMIENTO
+========================================== */
+
+document
+    .getElementById(
+        "save-movement"
+    )
+    .addEventListener(
+        "click",
+        async () => {
+
+            if (!currentUser ||
+                !currentHomeId) {
+
+                alert(
+                    "No hay un hogar activo."
+                );
+
+                return;
+            }
+
+
+            const description =
+                document.getElementById(
+                    "movement-description"
+                ).value.trim();
+
+
+            const amount =
+                Number(
+                    document.getElementById(
+                        "movement-amount"
+                    ).value
+                );
+
+
+            const category =
+                document.getElementById(
+                    "movement-category"
+                ).value;
+
+
+            const date =
+                document.getElementById(
+                    "movement-date"
+                ).value;
+
+
+            if (!description ||
+                !amount ||
+                amount <= 0 ||
+                !date) {
+
+                alert(
+                    "Completa descripción, importe y fecha."
+                );
+
+                return;
+            }
+
+
+            try {
+
+                await addDoc(
+
+                    collection(
+                        db,
+                        "homes",
+                        currentHomeId,
+                        "sharedTransactions"
+                    ),
+
+                    {
+
+                        homeId:
+                            currentHomeId,
+
+                        createdBy:
+                            currentUser.uid,
+
+                        createdByName:
+                            currentUser.displayName ||
+                            "Usuario",
+
+                        type:
+                            movementType,
+
+                        description,
+
+                        amount,
+
+                        category:
+                            category ||
+                            "otros",
+
+                        date,
+
+                        createdAt:
+                            serverTimestamp()
+
+                    }
+
+                );
+
+
+                document.getElementById(
+                    "movement-description"
+                ).value = "";
+
+
+                document.getElementById(
+                    "movement-amount"
+                ).value = "";
+
+
+                document.getElementById(
+                    "movement-category"
+                ).value = "";
+
+
+                alert(
+                    "Movimiento guardado."
+                );
+
+
+                showSection(
+                    "home"
+                );
+
+
+            } catch (error) {
+
+                console.error(error);
+
+                alert(
+                    "No se ha podido guardar el movimiento."
+                );
+
+            }
+
+        }
+    );
+
+
+/* ==========================================
+   MOVIMIENTOS
+========================================== */
+
+function loadMovements(homeId) {
+
+    const list =
+        document.getElementById(
+            "movements-list"
+        );
+
+
+    const transactionsRef =
+        collection(
+            db,
+            "homes",
+            homeId,
+            "sharedTransactions"
+        );
+
+
+    const transactionsQuery =
+        query(
+            transactionsRef,
+            orderBy(
+                "date",
+                "desc"
+            )
+        );
+
+
+    onSnapshot(
+
+        transactionsQuery,
+
+        snapshot => {
+
+            list.innerHTML = "";
+
+
+            let income = 0;
+
+            let expenses = 0;
+
+
+            if (snapshot.empty) {
+
+                list.innerHTML =
+                    `<div class="empty-state">
+                        No hay movimientos todavía.
+                    </div>`;
+
+            }
+
+
+            snapshot.forEach(
+                transaction => {
+
+                    const data =
+                        transaction.data();
+
+
+                    const amount =
+                        Number(
+                            data.amount
+                        );
+
+
+                    if (
+                        data.type ===
+                        "income"
+                    ) {
+
+                        income += amount;
+
+                    } else {
+
+                        expenses += amount;
+
+                    }
+
+
+                    const item =
+                        document.createElement(
+                            "div"
+                        );
+
+
+                    item.className =
+                        "card";
+
+
+                    const sign =
+                        data.type ===
+                        "income"
+                            ? "+"
+                            : "-";
+
+
+                    item.innerHTML = `
+
+                        <div
+                            style="
+                            display:flex;
+                            justify-content:space-between;
+                            gap:10px;
+                            "
+                        >
+
+                            <div>
+
+                                <strong
+                                    style="font-size:16px"
+                                >
+                                    ${escapeHtml(
+                                        data.description
+                                    )}
+                                </strong>
+
+                                <small>
+                                    ${escapeHtml(
+                                        data.category ||
+                                        "Otros"
+                                    )}
+                                    ·
+                                    ${escapeHtml(
+                                        data.date ||
+                                        ""
+                                    )}
+                                </small>
+
+                            </div>
+
+                            <strong
+                                class="${
+                                    data.type ===
+                                    "income"
+                                    ? "positive"
+                                    : "negative"
+                                }"
+                            >
+                                ${sign}
+                                ${formatMoney(
+                                    amount
+                                )}
+                            </strong>
+
+                        </div>
+                    `;
+
+
+                    list.appendChild(
+                        item
+                    );
+
+                }
+            );
+
+
+            document.getElementById(
+                "shared-income"
+            ).textContent =
+                formatMoney(income);
+
+
+            document.getElementById(
+                "shared-expenses"
+            ).textContent =
+                formatMoney(expenses);
+
+
+            document.getElementById(
+                "monthly-balance"
+            ).textContent =
+                formatMoney(
+                    income - expenses
+                );
+
+        },
+
+        error => {
+
+            console.error(
+                "Error leyendo movimientos:",
+                error
+            );
+
+            list.innerHTML =
+                `<div class="empty-state">
+                    No se han podido cargar los movimientos.
+                </div>`;
+
+        }
+
+    );
+
+}
+
+
+/* ==========================================
+   MIEMBROS
+========================================== */
+
+function loadMembers(homeId) {
+
+    const list =
+        document.getElementById(
+            "members-list"
+        );
+
+
+    const membersRef =
+        collection(
+            db,
+            "homes",
+            homeId,
+            "members"
+        );
+
+
+    onSnapshot(
+
+        membersRef,
+
+        snapshot => {
+
+            list.innerHTML = "";
+
+
+            snapshot.forEach(
+                member => {
+
+                    const data =
+                        member.data();
+
+
+                    const item =
+                        document.createElement(
+                            "div"
+                        );
+
+
+                    item.className =
+                        "card";
+
+
+                    item.innerHTML = `
+
+                        <strong>
+                            ${escapeHtml(
+                                data.name ||
+                                "Usuario"
+                            )}
+                        </strong>
+
+                        <small>
+                            ${escapeHtml(
+                                data.email ||
+                                ""
+                            )}
+                        </small>
+
+                        <small>
+                            ${data.role === "owner"
+                                ? "Administrador"
+                                : "Miembro"}
+                        </small>
+
+                    `;
+
+
+                    list.appendChild(
+                        item
+                    );
+
+                }
+            );
+
+        }
+
+    );
+
+}
+
+
+/* ==========================================
+   INVITACIONES
+========================================== */
+
+document
+    .getElementById(
+        "send-invitation"
+    )
+    .addEventListener(
+        "click",
+        async () => {
+
+            const email =
+                document.getElementById(
+                    "invite-email"
+                ).value
+                .trim()
+                .toLowerCase();
+
+
+            const result =
+                document.getElementById(
+                    "invite-result"
+                );
+
+
+            if (!email) {
+
+                result.textContent =
+                    "Introduce un correo.";
+
+                return;
+            }
+
+
+            if (!currentHomeId ||
+                !currentUser) {
+
+                return;
+            }
+
+
+            try {
+
+                await addDoc(
+
+                    collection(
+                        db,
+                        "invitations"
+                    ),
+
+                    {
+
+                        email,
+
+                        homeId:
+                            currentHomeId,
+
+                        createdBy:
+                            currentUser.uid,
+
+                        status:
+                            "pending",
+
+                        createdAt:
+                            serverTimestamp()
+
+                    }
+
+                );
+
+
+                result.textContent =
+                    "Invitación creada correctamente.";
+
+
+                document.getElementById(
+                    "invite-email"
+                ).value = "";
+
+
+            } catch (error) {
+
+                console.error(error);
+
+                result.textContent =
+                    "No se ha podido crear la invitación.";
+
+            }
+
+        }
+    );
+
+
+/* ==========================================
+   UTILIDADES
+========================================== */
+
+function formatMoney(
+    amount
+) {
+
+    return new Intl.NumberFormat(
+        "es-ES",
+        {
+            style: "currency",
+            currency: "EUR"
+        }
+    ).format(amount);
+
+}
+
+
+function escapeHtml(
+    value
+) {
+
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.textContent =
+        String(value ?? "");
+
+
+    return div.innerHTML;
+
+}
+
+
+/* ==========================================
+   FECHA POR DEFECTO
+========================================== */
+
+const dateInput =
+    document.getElementById(
+        "movement-date"
+    );
+
+
+if (dateInput) {
+
+    const today =
+        new Date()
+            .toISOString()
+            .split("T")[0];
+
+    dateInput.value =
+        today;
+
+}
+
+
+/* ==========================================
    SERVICE WORKER
-   ========================================= */
+========================================== */
 
-if ("serviceWorker" in navigator) {
+if (
+    "serviceWorker"
+    in navigator
+) {
 
     window.addEventListener(
         "load",
         () => {
 
-            navigator.serviceWorker.register(
-                "service-worker.js"
-            ).catch(error => {
-
-                console.error(
-                    "Error registrando Service Worker:",
-                    error
+            navigator.serviceWorker
+                .register(
+                    "service-worker.js"
+                )
+                .catch(
+                    error =>
+                        console.error(
+                            error
+                        )
                 );
-
-            });
 
         }
     );
